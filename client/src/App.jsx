@@ -619,6 +619,9 @@ export default function App() {
     }
   };
 
+  // 🌐 Variable de entorno para conectar a Render en la nube o localhost en tu PC
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
   const [initialLoading, setInitialLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
   const [{ cells: fireData, resolution: loadedResolution }, setFireData] =
@@ -702,17 +705,15 @@ export default function App() {
     setDataError(false);
 
     Promise.all([
-      fetch(
-        `http://localhost:8000/api/fires/harmonized?resolution=${h3Resolution}`,
-        { signal: controller.signal },
-      ).then((res) => {
+      fetch(`${API_URL}/api/fires/harmonized?resolution=${h3Resolution}`, {
+        signal: controller.signal,
+      }).then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       }),
-      fetch(
-        `http://localhost:8000/api/fires/calendar?resolution=${h3Resolution}`,
-        { signal: controller.signal },
-      ).then((res) => (res.ok ? res.json() : null)),
+      fetch(`${API_URL}/api/fires/calendar?resolution=${h3Resolution}`, {
+        signal: controller.signal,
+      }).then((res) => (res.ok ? res.json() : null)),
     ])
       .then(([data, calData]) => {
         if (!active) return;
