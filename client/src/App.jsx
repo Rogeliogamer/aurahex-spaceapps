@@ -21,16 +21,279 @@ import {
   Line,
 } from "recharts";
 
+// Diccionario completo de traducciones (ES / EN)
+const I18N = {
+  es: {
+    backHome: "← Portada",
+    subtitle: "Calendario Armonizado & Motor H3",
+    dataUnavailable: "Datos no disponibles",
+    apiSynced: "API SINCRONIZADA",
+    cellsCount: "celdas",
+    exportActiveDay: "Exportar CSV del día activo",
+    exportAoiRange: "Exportar CSV del AOI y periodo",
+    updatingH3: "Actualizando resolución H3…",
+    noCellsToExport: "No hay celdas para exportar con estos filtros.",
+    noAoiRecordsToExport:
+      "No hay registros dentro del AOI y rango de fechas para exportar.",
+    activityCalendarTitle: "🔥 Calendario de Actividad",
+    vsMedian: "vs Mediana",
+    calendarPromo:
+      "Compara la serie armonizada MODIS/VIIRS contra la mediana histórica e identifica anomalías.",
+    hideCalendar: "Ocultar Calendario Histórico",
+    openCalendar: "Abrir Calendario de Quema",
+    aoiTitle: "📍 Exploración por Área (AOI)",
+    clear: "Limpiar",
+    quickRegionsLabel: "Regiones rápidas de exploración",
+    selectRegionPlaceholder: "Seleccionar región…",
+    quickRegionsNote:
+      "Áreas rectangulares aproximadas para exploración; no representan límites administrativos oficiales.",
+    coordBoxTitle: "Caja de coordenadas (Lat/Lon)",
+    northLabel: "Norte / Lat. máx.",
+    southLabel: "Sur / Lat. mín.",
+    westLabel: "Oeste / Lon. mín.",
+    eastLabel: "Este / Lon. máx.",
+    applyBoxBtn: "Aplicar caja Lat/Lon",
+    coordBoxNote: "El filtrado usa el centro geográfico de cada celda H3.",
+    boundsError:
+      "Revisa los límites: latitudes entre -90 y 90, longitudes entre -180 y 180 y Norte mayor que Sur.",
+    customBoxLabel: "Caja de coordenadas",
+    hexagonLabel: "Hexágono",
+    activeAreaTitle: "Área activa",
+    globalView: "Vista global",
+    harmonizedInAoi: "registros armonizados en el AOI",
+    recordsInCoverage: "registros en la cobertura actual",
+    clickHexagonHint:
+      "También puedes hacer clic directamente en un hexágono del mapa para inspeccionar su historial.",
+    analysisPeriod: "Periodo de análisis",
+    startDate: "Inicio",
+    endDate: "Fin",
+    daysAvailable: "días disponibles en el periodo seleccionado.",
+    basemapTitle: "Mapa Base",
+    darkMap: "🌑 Oscuro",
+    satMap: "🛰️ Satélite",
+    colorRampTitle: "Paleta Color",
+    thermalRamp: "🔥 Térmica",
+    viridisRamp: "👁️ Viridis",
+    semanticZoomTitle: "Zoom Semántico H3",
+    recalculating: "🔄 Recalculando...",
+    zoomResLabel: "Zoom / Resolución:",
+    levelWord: "Nivel",
+    areaPerCell: "Área por celda:",
+    temporalEvolution: "Evolución Temporal",
+    daysWord: "Días",
+    loading: "Cargando...",
+    constellationTitle: "Constelación Satelital",
+    threatLevelTitle: "Nivel de Amenaza (FRP)",
+    extremeLabel: "Extremo",
+    highLabel: "Alto",
+    moderateLabel: "Moderado",
+    severityDistTitle: "Distribución de Severidad",
+    activeAoiBadge: "Área de interés activa",
+    recordsWord: "registros",
+    toWord: "a",
+    harmonizedCalendarBtn: "📅 Calendario Armonizado",
+    aoiMedianBadge: "Mediana AOI:",
+    cellsPerDay: "celdas/día",
+    modalHeaderTitle: "📅 Calendario de Actividad de Quema —",
+    modalHeaderDesc:
+      "Actividad calculada con los registros armonizados del área y del periodo seleccionados. La anomalía se compara contra la mediana diaria de este mismo periodo.",
+    tabHeatmap: "🗓️ Mapa de Calor (Días)",
+    tabAnomalies: "📈 Anomalías vs. Mediana",
+    tabMultiyear: "🏛️ Régimen Multi-Anual",
+    closeCalendar: "Cerrar calendario",
+    kpiPeriodMedian: "Mediana del Periodo",
+    kpiCellsDay: "celdas H3/día",
+    kpiMedianEnergy: "Energía mediana:",
+    kpiCriticalDay: "Día Crítico (Pico)",
+    kpiAboveMedian: "sobre mediana",
+    kpiDedup: "Reducción de Duplicados",
+    kpiHotspots: "focos",
+    kpiActiveDate: "Fecha Activa en Mapa",
+    selectADay: "Selecciona un día",
+    heatmapInstruction:
+      "Haz clic en cualquier día del calendario para sincronizar el Mapa 3D:",
+    lowerActivity: "Menor actividad",
+    criticalPeriod: "Periodo crítico",
+    dailySeriesTitle: "Serie Diaria Armonizada vs. Mediana del Periodo",
+    medianRef: "Mediana",
+    activeH3Cells: "Celdas H3 Activas",
+    regionalHistoryTitle: "Comparativa histórica regional",
+    regionalHistoryUnavailable: "Referencia histórica regional no disponible",
+    regionalHistoryDesc:
+      "La API entrega 31 días de celdas armonizadas y un calendario histórico global. No contiene una serie multi-anual geolocalizada para calcular una mediana histórica exclusiva de este AOI.",
+    globalMonthlyTitle:
+      "Comparativa mensual global: actividad y referencia climatológica",
+    observedActivityBar: "Actividad estimada/observada (celdas H3)",
+    medianReferenceLine: "Referencia mediana",
+    thresholdReferenceLine: "Umbral de referencia",
+    globalRefFootnote:
+      "Referencia global del backend; no está filtrada por el rango ni representa una climatología regional observada.",
+    noMonthlyData: "No hay datos de referencia mensual disponibles.",
+    multiyearUnavailableTitle: "Matriz multi-anual no disponible para este AOI",
+    multiyearUnavailableDesc:
+      "La matriz actual del backend es global y no conserva la ubicación de cada año/mes. Desactiva el filtro AOI para inspeccionar el régimen multi-anual global.",
+    yearCol: "Año",
+    monthsShort: [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+    ],
+    harmonizedH3Cells: "celdas H3 armonizadas",
+    tooltipTemp: "Temp. Brillo Est.:",
+    tooltipConf: "Confianza Promedio:",
+    tooltipSats: "Satélites:",
+    tooltipMerged: "Focos fusionados:",
+    attribution: "Tiles © Esri, HERE, Garmin, USGS • Motor H3 Deck.gl",
+  },
+  en: {
+    backHome: "← Home",
+    subtitle: "Harmonized Calendar & H3 Engine",
+    dataUnavailable: "Data unavailable",
+    apiSynced: "API SYNCHRONIZED",
+    cellsCount: "cells",
+    exportActiveDay: "Export active day CSV",
+    exportAoiRange: "Export AOI & period CSV",
+    updatingH3: "Updating H3 resolution…",
+    noCellsToExport: "No cells to export with current filters.",
+    noAoiRecordsToExport: "No records inside AOI and date range to export.",
+    activityCalendarTitle: "🔥 Burning Activity Calendar",
+    vsMedian: "vs Median",
+    calendarPromo:
+      "Compare the harmonized MODIS/VIIRS time series against the historical median and spot anomalies.",
+    hideCalendar: "Hide Historical Calendar",
+    openCalendar: "Open Burning Calendar",
+    aoiTitle: "📍 Area of Interest (AOI)",
+    clear: "Clear",
+    quickRegionsLabel: "Quick exploration regions",
+    selectRegionPlaceholder: "Select region…",
+    quickRegionsNote:
+      "Approximate bounding boxes for exploration; they do not represent official administrative boundaries.",
+    coordBoxTitle: "Coordinate bounding box (Lat/Lon)",
+    northLabel: "North / Max Lat.",
+    southLabel: "South / Min Lat.",
+    westLabel: "West / Min Lon.",
+    eastLabel: "East / Max Lon.",
+    applyBoxBtn: "Apply Lat/Lon box",
+    coordBoxNote: "Filtering uses the geographic center of each H3 cell.",
+    boundsError:
+      "Check boundaries: latitudes between -90 and 90, longitudes between -180 and 180, and North greater than South.",
+    customBoxLabel: "Coordinate bounding box",
+    hexagonLabel: "Hexagon",
+    activeAreaTitle: "Active area",
+    globalView: "Global view",
+    harmonizedInAoi: "harmonized records in AOI",
+    recordsInCoverage: "records in current coverage",
+    clickHexagonHint:
+      "You can also click any hexagon directly on the map to inspect its history.",
+    analysisPeriod: "Analysis period",
+    startDate: "Start",
+    endDate: "End",
+    daysAvailable: "days available in selected period.",
+    basemapTitle: "Basemap",
+    darkMap: "🌑 Dark",
+    satMap: "🛰️ Satellite",
+    colorRampTitle: "Color Ramp",
+    thermalRamp: "🔥 Thermal",
+    viridisRamp: "👁️ Viridis",
+    semanticZoomTitle: "H3 Semantic Zoom",
+    recalculating: "🔄 Recalculating...",
+    zoomResLabel: "Zoom / Resolution:",
+    levelWord: "Level",
+    areaPerCell: "Area per cell:",
+    temporalEvolution: "Temporal Evolution",
+    daysWord: "Days",
+    loading: "Loading...",
+    constellationTitle: "Satellite Constellation",
+    threatLevelTitle: "Threat Level (FRP)",
+    extremeLabel: "Extreme",
+    highLabel: "High",
+    moderateLabel: "Moderate",
+    severityDistTitle: "Severity Distribution",
+    activeAoiBadge: "Active Area of Interest",
+    recordsWord: "records",
+    toWord: "to",
+    harmonizedCalendarBtn: "📅 Harmonized Calendar",
+    aoiMedianBadge: "AOI Median:",
+    cellsPerDay: "cells/day",
+    modalHeaderTitle: "📅 Burning Activity Calendar —",
+    modalHeaderDesc:
+      "Activity computed from harmonized records within the selected area and period. Anomalies are measured against the daily median of this period.",
+    tabHeatmap: "🗓️ Heatmap (Days)",
+    tabAnomalies: "📈 Anomalies vs. Median",
+    tabMultiyear: "🏛️ Multi-Year Regime",
+    closeCalendar: "Close calendar",
+    kpiPeriodMedian: "Period Median",
+    kpiCellsDay: "H3 cells/day",
+    kpiMedianEnergy: "Median energy:",
+    kpiCriticalDay: "Critical Day (Peak)",
+    kpiAboveMedian: "above median",
+    kpiDedup: "Duplicate Reduction",
+    kpiHotspots: "hotspots",
+    kpiActiveDate: "Active Map Date",
+    selectADay: "Select a day",
+    heatmapInstruction:
+      "Click any day on the calendar to synchronize the 3D Map:",
+    lowerActivity: "Lower activity",
+    criticalPeriod: "Critical period",
+    dailySeriesTitle: "Harmonized Daily Series vs. Period Median",
+    medianRef: "Median",
+    activeH3Cells: "Active H3 Cells",
+    regionalHistoryTitle: "Regional historical comparison",
+    regionalHistoryUnavailable: "Regional historical baseline unavailable",
+    regionalHistoryDesc:
+      "The API provides 31 days of harmonized cells and a global historical calendar. It does not contain a geolocated multi-year series for this specific AOI.",
+    globalMonthlyTitle:
+      "Global monthly comparison: activity & climatological baseline",
+    observedActivityBar: "Estimated/observed activity (H3 cells)",
+    medianReferenceLine: "Historical median",
+    thresholdReferenceLine: "Critical threshold (P90)",
+    globalRefFootnote:
+      "Global backend reference; not filtered by date range or regional AOI.",
+    noMonthlyData: "No monthly reference data available.",
+    multiyearUnavailableTitle: "Multi-year matrix unavailable for this AOI",
+    multiyearUnavailableDesc:
+      "The current backend matrix is global and does not store coordinates per year/month. Clear the AOI filter to inspect the global multi-year regime.",
+    yearCol: "Year",
+    monthsShort: [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ],
+    harmonizedH3Cells: "harmonized H3 cells",
+    tooltipTemp: "Est. Brightness Temp.:",
+    tooltipConf: "Avg. Confidence:",
+    tooltipSats: "Satellites:",
+    tooltipMerged: "Merged hotspots:",
+    attribution: "Tiles © Esri, HERE, Garmin, USGS • Deck.gl H3 Engine",
+  },
+};
+
 // Servidores de mapas de Esri
 const BASEMAPS = {
   DARK: {
-    name: "Oscuro Táctico",
     base: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     labels:
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
   },
   SATELLITE: {
-    name: "Satélite Real",
     base: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     labels:
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
@@ -40,14 +303,12 @@ const BASEMAPS = {
 // Rampas de color Accesibles
 const COLOR_RAMPS = {
   THERMAL: {
-    name: "Térmica",
     extremo: { hex: "#ef4444", rgb: [239, 68, 68, 235] },
     alto: { hex: "#f97316", rgb: [249, 115, 22, 225] },
     moderado: { hex: "#eab308", rgb: [234, 179, 8, 200] },
     heatScale: ["#1e293b", "#854d0e", "#ea580c", "#dc2626", "#f87171"],
   },
   ACCESSIBLE: {
-    name: "Accesible (Viridis)",
     extremo: { hex: "#fde047", rgb: [253, 224, 71, 240] },
     alto: { hex: "#2dd4bf", rgb: [45, 212, 191, 225] },
     moderado: { hex: "#6366f1", rgb: [99, 102, 241, 210] },
@@ -56,11 +317,20 @@ const COLOR_RAMPS = {
 };
 
 const H3_SCALE_INFO = {
-  4: "~1,770 km² (Macro)",
-  5: "~252 km² (Regional)",
-  6: "~36.1 km² (Estatal)",
-  7: "~5.16 km² (Municipal)",
-  8: "~0.74 km² (Local)",
+  es: {
+    4: "~1,770 km² (Macro)",
+    5: "~252 km² (Regional)",
+    6: "~36.1 km² (Estatal)",
+    7: "~5.16 km² (Municipal)",
+    8: "~0.74 km² (Local)",
+  },
+  en: {
+    4: "~1,770 km² (Macro)",
+    5: "~252 km² (Regional)",
+    6: "~36.1 km² (State)",
+    7: "~5.16 km² (Municipal)",
+    8: "~0.74 km² (Local)",
+  },
 };
 
 function resolutionForZoom(zoom) {
@@ -79,11 +349,11 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
-// Regiones rápidas de exploración
+// Regiones rápidas de exploración bilingües
 const QUICK_REGIONS = [
   {
     id: "northwest-mx",
-    label: "Noroeste de México",
+    label: { es: "Noroeste de México", en: "Northwest Mexico" },
     north: 32.8,
     south: 22.0,
     west: -117.2,
@@ -91,7 +361,7 @@ const QUICK_REGIONS = [
   },
   {
     id: "northeast-mx",
-    label: "Noreste de México",
+    label: { es: "Noreste de México", en: "Northeast Mexico" },
     north: 30.5,
     south: 22.0,
     west: -105.0,
@@ -99,7 +369,7 @@ const QUICK_REGIONS = [
   },
   {
     id: "west-bajio-mx",
-    label: "Occidente y Bajío",
+    label: { es: "Occidente y Bajío", en: "West & Bajío (MX)" },
     north: 24.5,
     south: 18.0,
     west: -106.0,
@@ -107,7 +377,7 @@ const QUICK_REGIONS = [
   },
   {
     id: "south-southeast-mx",
-    label: "Centro-sur y sureste",
+    label: { es: "Centro-sur y sureste", en: "South-Central & Southeast (MX)" },
     north: 21.0,
     south: 14.5,
     west: -102.0,
@@ -115,7 +385,7 @@ const QUICK_REGIONS = [
   },
   {
     id: "yucatan-mx",
-    label: "Península de Yucatán",
+    label: { es: "Península de Yucatán", en: "Yucatán Peninsula" },
     north: 22.8,
     south: 17.5,
     west: -92.0,
@@ -123,7 +393,7 @@ const QUICK_REGIONS = [
   },
   {
     id: "california-us",
-    label: "California",
+    label: { es: "California", en: "California (US)" },
     north: 42.1,
     south: 32.5,
     west: -124.5,
@@ -163,7 +433,7 @@ function isCellInsideAOI(record, aoi) {
       latitude <= aoi.north &&
       isLongitudeInside(longitude, aoi.west, aoi.east)
     );
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -292,7 +562,7 @@ function downloadAOIRangeCSV(
   ];
   const escapeCSV = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const rows = records.map((record) => [
-    aoiLabel || "Vista global",
+    aoiLabel || "Global",
     record.h3_index,
     record.acq_date,
     record.total_frp,
@@ -312,14 +582,43 @@ function downloadAOIRangeCSV(
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
   link.href = url;
-  link.download = `aurahex-${safeLabel}-h3-${resolution}-${startDate || "inicio"}-${endDate || "fin"}.csv`;
+  link.download = `aurahex-${safeLabel}-h3-${resolution}-${startDate || "start"}-${endDate || "end"}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
 }
 
+function getInitialLang() {
+  try {
+    const saved =
+      localStorage.getItem("aurahex-lang") ||
+      localStorage.getItem("lang") ||
+      localStorage.getItem("language") ||
+      document.documentElement.lang;
+    if (saved && saved.toLowerCase().startsWith("en")) return "en";
+  } catch {
+    // Ignorar errores de acceso a localStorage
+  }
+  return "es";
+}
+
 export default function App() {
+  const [lang, setLang] = useState(getInitialLang);
+  const t = I18N[lang] || I18N.es;
+
+  const toggleLanguage = () => {
+    const next = lang === "es" ? "en" : "es";
+    setLang(next);
+    try {
+      localStorage.setItem("aurahex-lang", next);
+      localStorage.setItem("lang", next);
+      document.documentElement.lang = next;
+    } catch {
+      // Ignorar si localStorage no está disponible
+    }
+  };
+
   const [initialLoading, setInitialLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
   const [{ cells: fireData, resolution: loadedResolution }, setFireData] =
@@ -327,7 +626,6 @@ export default function App() {
   const [uniqueDates, setUniqueDates] = useState([]);
 
   // Controles de tiempo
-  const [currentDateIndex, setCurrentDateIndex] = useState(0);
   const [currentDate, setCurrentDate] = useState("");
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
@@ -368,6 +666,17 @@ export default function App() {
   });
 
   const activePalette = COLOR_RAMPS[colorRamp];
+
+  const getAOILabel = (aoi) => {
+    if (!aoi) return t.globalView;
+    if (aoi.regionId) {
+      const found = QUICK_REGIONS.find((r) => r.id === aoi.regionId);
+      if (found) return found.label[lang];
+    }
+    if (aoi.type === "hexagon") return `${t.hexagonLabel} ${aoi.h3Index}`;
+    if (aoi.type === "bounds") return t.customBoxLabel;
+    return aoi.label || t.globalView;
+  };
 
   const onViewStateChange = ({ viewState: nextViewState }) => {
     setViewState(nextViewState);
@@ -503,11 +812,17 @@ export default function App() {
       const hasNoaa20 =
         instrumentsStr.includes("NOAA-20") ||
         instrumentsStr.includes("N20") ||
-        instrumentsStr.split(",").map((value) => value.trim()).includes("1");
+        instrumentsStr
+          .split(",")
+          .map((s) => s.trim())
+          .includes("1");
       const hasNoaa21 =
         instrumentsStr.includes("NOAA-21") ||
         instrumentsStr.includes("N21") ||
-        instrumentsStr.split(",").map((value) => value.trim()).includes("2");
+        instrumentsStr
+          .split(",")
+          .map((s) => s.trim())
+          .includes("2");
 
       const satMatch =
         (activeSats.MODIS && hasModis) ||
@@ -517,11 +832,14 @@ export default function App() {
       const isExtremo = d.total_frp > 150;
       const isAlto = d.total_frp > 50 && d.total_frp <= 150;
       const isModerado = d.total_frp <= 50;
-      const threatMatch =
-        (activeThreats.EXTREMO && isExtremo) ||
-        (activeThreats.ALTO && isAlto) ||
-        (activeThreats.MODERADO && isModerado);
-      const dateMatch = currentDate ? d.acq_date === currentDate : false;
+
+      let threatMatch = false;
+      if (activeThreats.EXTREMO && isExtremo) threatMatch = true;
+      if (activeThreats.ALTO && isAlto) threatMatch = true;
+      if (activeThreats.MODERADO && isModerado) threatMatch = true;
+
+      const dateMatch = currentDate ? d.acq_date === currentDate : true;
+
       return satMatch && threatMatch && dateMatch;
     });
   }, [rangeFilteredData, activeSats, activeThreats, currentDate]);
@@ -564,7 +882,14 @@ export default function App() {
   const applyQuickRegion = (regionId) => {
     const region = QUICK_REGIONS.find((item) => item.id === regionId);
     if (!region) return;
-    setSelectedAOI({ type: "bounds", regionId: region.id, ...region });
+    setSelectedAOI({
+      type: "bounds",
+      regionId: region.id,
+      north: region.north,
+      south: region.south,
+      west: region.west,
+      east: region.east,
+    });
     setBoundsDraft({
       north: String(region.north),
       south: String(region.south),
@@ -597,12 +922,10 @@ export default function App() {
       bounds.east >= -180 &&
       bounds.west !== bounds.east;
     if (!valid) {
-      setAoiError(
-        "Revisa los límites: latitudes entre -90 y 90, longitudes entre -180 y 180 y Norte mayor que Sur.",
-      );
+      setAoiError(t.boundsError);
       return;
     }
-    setSelectedAOI({ type: "bounds", label: "Caja de coordenadas", ...bounds });
+    setSelectedAOI({ type: "bounds", ...bounds });
     setAoiError("");
     setIsPlaying(false);
     focusBounds(bounds);
@@ -615,12 +938,7 @@ export default function App() {
         lon,
         lat,
       ]);
-      setSelectedAOI({
-        type: "hexagon",
-        label: `Hexágono ${record.h3_index}`,
-        h3Index: record.h3_index,
-        boundary,
-      });
+      setSelectedAOI({ type: "hexagon", h3Index: record.h3_index, boundary });
       setIsPlaying(false);
       setHoverInfo(null);
       const zoom = Math.max(viewState.zoom, 8);
@@ -628,7 +946,7 @@ export default function App() {
       setCameraZoom(Math.round(zoom * 10) / 10);
       setTargetResolution(resolutionForZoom(zoom));
     } catch (error) {
-      console.error("No se pudo seleccionar el hexágono:", error);
+      console.error("Error:", error);
     }
   };
 
@@ -647,11 +965,27 @@ export default function App() {
       else moderado++;
     });
     return [
-      { name: "Extremo", value: extremo, color: activePalette.extremo.hex },
-      { name: "Alto", value: alto, color: activePalette.alto.hex },
-      { name: "Moderado", value: moderado, color: activePalette.moderado.hex },
+      {
+        name: t.extremeLabel,
+        value: extremo,
+        color: activePalette.extremo.hex,
+      },
+      { name: t.highLabel, value: alto, color: activePalette.alto.hex },
+      {
+        name: t.moderateLabel,
+        value: moderado,
+        color: activePalette.moderado.hex,
+      },
     ];
-  }, [filteredData, activePalette]);
+  }, [filteredData, activePalette, t]);
+
+  const localizedClimatology = useMemo(() => {
+    if (!calendarData?.monthly_climatology) return [];
+    return calendarData.monthly_climatology.map((item, idx) => ({
+      ...item,
+      monthLabel: t.monthsShort[idx] || item.month,
+    }));
+  }, [calendarData, t]);
 
   const getHeatColor = (ratio) => {
     const scale = activePalette.heatScale;
@@ -743,24 +1077,36 @@ export default function App() {
 
   if (initialLoading) return <MapLoading />;
 
+  const activeAoiText = getAOILabel(selectedAOI);
+
   return (
     <div className="flex h-screen w-full bg-gray-950 text-white overflow-hidden font-sans">
       <div className="w-96 bg-gray-900/95 p-5 flex flex-col gap-3.5 z-10 shadow-2xl overflow-y-auto border-r border-gray-800">
         <div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
               AuraHex
             </h1>
-            <a
-              href="/"
-              className="text-[11px] text-gray-400 hover:text-white bg-gray-800 px-2.5 py-1 rounded-md border border-gray-700 transition-colors"
-            >
-              ← Portada
-            </a>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={toggleLanguage}
+                className="text-[11px] font-mono font-bold text-orange-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded-md border border-orange-500/40 transition-colors cursor-pointer"
+                title={
+                  lang === "es" ? "Switch to English" : "Cambiar a Español"
+                }
+              >
+                🌐 {lang === "es" ? "ES · EN" : "EN · ES"}
+              </button>
+              <a
+                href="/"
+                className="text-[11px] text-gray-400 hover:text-white bg-gray-800 px-2.5 py-1 rounded-md border border-gray-700 transition-colors"
+              >
+                {t.backHome}
+              </a>
+            </div>
           </div>
-          <p className="text-gray-400 text-xs mt-0.5">
-            Calendario Armonizado & Motor H3
-          </p>
+          <p className="text-gray-400 text-xs mt-0.5">{t.subtitle}</p>
 
           <div className="mt-2.5 flex items-center justify-between bg-gray-800/70 px-3 py-2 rounded-lg border border-gray-700/60">
             {dataError ? (
@@ -768,7 +1114,7 @@ export default function App() {
                 role="status"
                 className="text-xs font-semibold text-orange-300"
               >
-                Datos no disponibles
+                {t.dataUnavailable}
               </span>
             ) : (
               <div className="flex items-center gap-2 text-xs font-semibold">
@@ -776,11 +1122,11 @@ export default function App() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </span>
-                <span className="text-green-400">API SINCRONIZADA</span>
+                <span className="text-green-400">{t.apiSynced}</span>
               </div>
             )}
             <span className="text-xs font-mono text-gray-300">
-              {filteredData.length} celdas
+              {filteredData.length} {t.cellsCount}
             </span>
           </div>
 
@@ -792,7 +1138,8 @@ export default function App() {
             }
             className="mt-2 w-full rounded-lg border border-orange-500/50 bg-orange-600/20 px-3 py-2 text-xs font-bold text-orange-200 transition-colors enabled:cursor-pointer enabled:hover:bg-orange-600/35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <span aria-hidden="true">⬇️ </span>Exportar CSV del día activo
+            <span aria-hidden="true">⬇️ </span>
+            {t.exportActiveDay}
           </button>
 
           <button
@@ -804,24 +1151,23 @@ export default function App() {
                 loadedResolution,
                 dateStart,
                 dateEnd,
-                selectedAOI?.label,
+                activeAoiText,
               )
             }
             className="mt-1 w-full rounded-lg border border-cyan-500/50 bg-cyan-600/15 px-3 py-2 text-xs font-bold text-cyan-100 transition-colors enabled:cursor-pointer enabled:hover:bg-cyan-600/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <span aria-hidden="true">⬇️ </span>Exportar CSV del AOI y periodo
+            <span aria-hidden="true">⬇️ </span>
+            {t.exportAoiRange}
           </button>
 
           {!dataError && !canExportCsv && (
             <p className="mt-1 text-[11px] text-gray-400">
-              {exportPending
-                ? "Actualizando resolución H3…"
-                : "No hay celdas para exportar con estos filtros."}
+              {exportPending ? t.updatingH3 : t.noCellsToExport}
             </p>
           )}
           {!dataError && !canExportRangeCsv && !exportPending && (
             <p className="mt-1 text-[10px] text-gray-500">
-              No hay registros dentro del AOI y rango de fechas para exportar.
+              {t.noAoiRecordsToExport}
             </p>
           )}
         </div>
@@ -829,7 +1175,7 @@ export default function App() {
         <div className="bg-gradient-to-br from-orange-950/60 via-gray-900 to-gray-900 p-3.5 rounded-xl border border-orange-500/40 shadow-lg">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-orange-300">
-              🔥 Calendario de Actividad
+              {t.activityCalendarTitle}
             </span>
             {currentDayStats && (
               <span
@@ -838,24 +1184,18 @@ export default function App() {
                 {currentDayStats.anomaly_pct > 0
                   ? `+${currentDayStats.anomaly_pct}%`
                   : `${currentDayStats.anomaly_pct}%`}{" "}
-                vs Mediana
+                {t.vsMedian}
               </span>
             )}
           </div>
           <p className="text-[11px] text-gray-300 leading-relaxed mb-2.5">
-            Compara la serie armonizada MODIS/VIIRS contra la mediana histórica
-            e identifica anomalías.
+            {t.calendarPromo}
           </p>
           <button
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
             className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-orange-600 hover:bg-orange-500 text-white transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>
-              📅{" "}
-              {isCalendarOpen
-                ? "Ocultar Calendario Histórico"
-                : "Abrir Calendario de Quema"}
-            </span>
+            <span>📅 {isCalendarOpen ? t.hideCalendar : t.openCalendar}</span>
           </button>
         </div>
 
@@ -863,15 +1203,15 @@ export default function App() {
         <section className="rounded-xl border border-cyan-500/30 bg-gray-800/80 p-3.5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
-              📍 Exploración por Área (AOI)
+              {t.aoiTitle}
             </h3>
             {selectedAOI && (
               <button
                 type="button"
                 onClick={clearAOI}
-                className="text-[10px] font-semibold text-orange-300 hover:text-white"
+                className="text-[10px] font-semibold text-orange-300 hover:text-white cursor-pointer"
               >
-                Limpiar
+                {t.clear}
               </button>
             )}
           </div>
@@ -880,7 +1220,7 @@ export default function App() {
               htmlFor="quick-region"
               className="mb-1 block text-[10px] font-semibold text-gray-400"
             >
-              Regiones rápidas de exploración
+              {t.quickRegionsLabel}
             </label>
             <select
               id="quick-region"
@@ -888,34 +1228,27 @@ export default function App() {
               onChange={(event) => applyQuickRegion(event.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-900 px-2.5 py-2 text-xs text-white outline-none focus:border-cyan-400"
             >
-              <option value="">Seleccionar región…</option>
+              <option value="">{t.selectRegionPlaceholder}</option>
               {QUICK_REGIONS.map((region) => (
                 <option key={region.id} value={region.id}>
-                  {region.label}
+                  {region.label[lang]}
                 </option>
               ))}
             </select>
             <p className="mt-1 text-[10px] leading-relaxed text-gray-500">
-              Áreas rectangulares aproximadas para exploración; no representan
-              límites administrativos oficiales ni zonas críticas detectadas
-              automáticamente.
+              {t.quickRegionsNote}
             </p>
           </div>
           <form onSubmit={applyCustomBounds} className="space-y-2">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Caja de coordenadas (Lat/Lon)
+              {t.coordBoxTitle}
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { key: "north", label: "Norte / Lat. máx.", min: -90, max: 90 },
-                { key: "south", label: "Sur / Lat. mín.", min: -90, max: 90 },
-                {
-                  key: "west",
-                  label: "Oeste / Lon. mín.",
-                  min: -180,
-                  max: 180,
-                },
-                { key: "east", label: "Este / Lon. máx.", min: -180, max: 180 },
+                { key: "north", label: t.northLabel, min: -90, max: 90 },
+                { key: "south", label: t.southLabel, min: -90, max: 90 },
+                { key: "west", label: t.westLabel, min: -180, max: 180 },
+                { key: "east", label: t.eastLabel, min: -180, max: 180 },
               ].map((field) => (
                 <label key={field.key} className="text-[10px] text-gray-400">
                   {field.label}
@@ -948,14 +1281,12 @@ export default function App() {
             </div>
             <button
               type="submit"
-              className="w-full rounded-lg border border-cyan-500/50 bg-cyan-600/20 px-3 py-2 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-600/35"
+              className="w-full rounded-lg border border-cyan-500/50 bg-cyan-600/20 px-3 py-2 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-600/35 cursor-pointer"
             >
-              Aplicar caja Lat/Lon
+              {t.applyBoxBtn}
             </button>
             <p className="text-[10px] leading-relaxed text-gray-500">
-              El filtrado usa el centro geográfico de cada celda H3; las celdas
-              que cruzan el borde pueden quedar incluidas o excluidas según su
-              centro.
+              {t.coordBoxNote}
             </p>
           </form>
           {aoiError && (
@@ -969,29 +1300,28 @@ export default function App() {
 
           <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-2">
             <div className="text-[10px] uppercase tracking-wide text-gray-500">
-              Área activa
+              {t.activeAreaTitle}
             </div>
             <div className="mt-0.5 break-words text-xs font-semibold text-gray-200">
-              {selectedAOI?.label || "Vista global"}
+              {activeAoiText}
             </div>
             <div className="mt-1 text-[10px] text-gray-400">
               {selectedAOI
-                ? `${rangeFilteredData.length.toLocaleString()} registros armonizados en el AOI`
-                : `${fireData.length.toLocaleString()} registros en la cobertura actual`}
+                ? `${rangeFilteredData.length.toLocaleString()} ${t.harmonizedInAoi}`
+                : `${fireData.length.toLocaleString()} ${t.recordsInCoverage}`}
             </div>
             <p className="mt-1 text-[10px] text-gray-500">
-              También puedes hacer clic directamente en un hexágono del mapa
-              para inspeccionar su historial.
+              {t.clickHexagonHint}
             </p>
           </div>
 
           <div className="border-t border-gray-700 pt-2">
             <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-              Periodo de análisis
+              {t.analysisPeriod}
             </h4>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[10px] text-gray-400">
-                Inicio
+                {t.startDate}
                 <input
                   type="date"
                   min={uniqueDates[0] || undefined}
@@ -1007,7 +1337,7 @@ export default function App() {
                 />
               </label>
               <label className="text-[10px] text-gray-400">
-                Fin
+                {t.endDate}
                 <input
                   type="date"
                   min={dateStart || uniqueDates[0] || undefined}
@@ -1024,7 +1354,7 @@ export default function App() {
               </label>
             </div>
             <p className="mt-1.5 text-[10px] text-gray-500">
-              {rangeDates.length} días disponibles en el periodo seleccionado.
+              {rangeDates.length} {t.daysAvailable}
             </p>
           </div>
         </section>
@@ -1032,32 +1362,32 @@ export default function App() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <h3 className="text-[11px] text-gray-400 uppercase font-bold tracking-wider mb-1.5">
-              Mapa Base
+              {t.basemapTitle}
             </h3>
             <div className="grid grid-cols-2 gap-1">
               {Object.entries(BASEMAPS).map(([key]) => (
                 <button
                   key={key}
                   onClick={() => setMapTheme(key)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border ${mapTheme === key ? "bg-orange-600/20 border-orange-500 text-orange-300" : "bg-gray-800 border-gray-700 text-gray-400"}`}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border cursor-pointer ${mapTheme === key ? "bg-orange-600/20 border-orange-500 text-orange-300" : "bg-gray-800 border-gray-700 text-gray-400"}`}
                 >
-                  {key === "DARK" ? "🌑 Oscuro" : "🛰️ Satélite"}
+                  {key === "DARK" ? t.darkMap : t.satMap}
                 </button>
               ))}
             </div>
           </div>
           <div>
             <h3 className="text-[11px] text-gray-400 uppercase font-bold tracking-wider mb-1.5">
-              Paleta Color
+              {t.colorRampTitle}
             </h3>
             <div className="grid grid-cols-2 gap-1">
               {Object.entries(COLOR_RAMPS).map(([key]) => (
                 <button
                   key={key}
                   onClick={() => setColorRamp(key)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border ${colorRamp === key ? "bg-indigo-600/30 border-indigo-400 text-indigo-200" : "bg-gray-800 border-gray-700 text-gray-400"}`}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all border cursor-pointer ${colorRamp === key ? "bg-indigo-600/30 border-indigo-400 text-indigo-200" : "bg-gray-800 border-gray-700 text-gray-400"}`}
                 >
-                  {key === "THERMAL" ? "🔥 Térmica" : "👁️ Viridis"}
+                  {key === "THERMAL" ? t.thermalRamp : t.viridisRamp}
                 </button>
               ))}
             </div>
@@ -1067,31 +1397,31 @@ export default function App() {
         <div className="bg-gray-800/90 p-3 rounded-xl border border-gray-700">
           <div className="flex justify-between items-center mb-1">
             <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider">
-              Zoom Semántico H3
+              {t.semanticZoomTitle}
             </h3>
             {isRecalculating && (
               <span className="text-[11px] text-orange-400 animate-pulse font-bold">
-                🔄 Recalculando...
+                {t.recalculating}
               </span>
             )}
           </div>
           <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-300">Zoom / Resolución:</span>
+            <span className="text-gray-300">{t.zoomResLabel}</span>
             <span className="font-mono font-bold text-orange-400">
-              {cameraZoom.toFixed(1)}x • Nivel {h3Resolution}
+              {cameraZoom.toFixed(1)}x • {t.levelWord} {h3Resolution}
             </span>
           </div>
           <div className="mt-1 pt-1 border-t border-gray-700/70 flex justify-between text-[11px] text-gray-400">
-            <span>Área por celda:</span>
+            <span>{t.areaPerCell}</span>
             <span className="font-mono text-gray-200">
-              {H3_SCALE_INFO[h3Resolution]}
+              {H3_SCALE_INFO[lang][h3Resolution]}
             </span>
           </div>
         </div>
 
         <div className="bg-gray-800/90 p-3 rounded-xl border border-gray-700">
           <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-2">
-            Evolución Temporal ({rangeDates.length} Días)
+            {t.temporalEvolution} ({rangeDates.length} {t.daysWord})
           </h3>
           <div className="flex items-center gap-3">
             <button
@@ -1103,7 +1433,7 @@ export default function App() {
             </button>
             <div className="flex-1">
               <div className="text-sm font-bold text-orange-300 font-mono">
-                {currentDate || "Cargando..."}
+                {currentDate || t.loading}
               </div>
               <input
                 type="range"
@@ -1123,14 +1453,14 @@ export default function App() {
 
         <div>
           <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1.5">
-            Constelación Satelital
+            {t.constellationTitle}
           </h3>
           <div className="grid grid-cols-3 gap-1.5">
             <button
               onClick={() =>
                 setActiveSats({ ...activeSats, MODIS: !activeSats.MODIS })
               }
-              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${activeSats.MODIS ? "bg-blue-600 text-white shadow-md" : "bg-gray-800 text-gray-500 border border-gray-700"}`}
+              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${activeSats.MODIS ? "bg-blue-600 text-white shadow-md" : "bg-gray-800 text-gray-500 border border-gray-700"}`}
             >
               MODIS
               <span className="block text-[9px] font-normal opacity-80">
@@ -1141,7 +1471,7 @@ export default function App() {
               onClick={() =>
                 setActiveSats({ ...activeSats, NOAA20: !activeSats.NOAA20 })
               }
-              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${activeSats.NOAA20 ? "bg-purple-600 text-white shadow-md" : "bg-gray-800 text-gray-500 border border-gray-700"}`}
+              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${activeSats.NOAA20 ? "bg-purple-600 text-white shadow-md" : "bg-gray-800 text-gray-500 border border-gray-700"}`}
             >
               VIIRS N20
               <span className="block text-[9px] font-normal opacity-80">
@@ -1152,7 +1482,7 @@ export default function App() {
               onClick={() =>
                 setActiveSats({ ...activeSats, NOAA21: !activeSats.NOAA21 })
               }
-              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${activeSats.NOAA21 ? "bg-fuchsia-600 text-white shadow-md" : "bg-gray-800 text-gray-500 border border-gray-700"}`}
+              className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${activeSats.NOAA21 ? "bg-fuchsia-600 text-white shadow-md" : "bg-gray-800 text-gray-500 border border-gray-700"}`}
             >
               VIIRS N21
               <span className="block text-[9px] font-normal opacity-80">
@@ -1164,7 +1494,7 @@ export default function App() {
 
         <div>
           <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1.5">
-            Nivel de Amenaza (FRP)
+            {t.threatLevelTitle}
           </h3>
           <div className="flex flex-col gap-1.5">
             <button
@@ -1174,9 +1504,11 @@ export default function App() {
                   EXTREMO: !activeThreats.EXTREMO,
                 })
               }
-              className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-xs transition-colors border ${activeThreats.EXTREMO ? "border-red-500/80 bg-gray-800 text-white" : "border-gray-800 bg-gray-800/40 text-gray-500"}`}
+              className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-xs transition-colors border cursor-pointer ${activeThreats.EXTREMO ? "border-red-500/80 bg-gray-800 text-white" : "border-gray-800 bg-gray-800/40 text-gray-500"}`}
             >
-              <span className="font-bold">Extremo ({">"}150 MW)</span>
+              <span className="font-bold">
+                {t.extremeLabel} ({">"}150 MW)
+              </span>
               <span
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: activePalette.extremo.hex }}
@@ -1189,9 +1521,9 @@ export default function App() {
                   ALTO: !activeThreats.ALTO,
                 })
               }
-              className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-xs transition-colors border ${activeThreats.ALTO ? "border-orange-500/80 bg-gray-800 text-white" : "border-gray-800 bg-gray-800/40 text-gray-500"}`}
+              className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-xs transition-colors border cursor-pointer ${activeThreats.ALTO ? "border-orange-500/80 bg-gray-800 text-white" : "border-gray-800 bg-gray-800/40 text-gray-500"}`}
             >
-              <span className="font-bold">Alto (50–150 MW)</span>
+              <span className="font-bold">{t.highLabel} (50–150 MW)</span>
               <span
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: activePalette.alto.hex }}
@@ -1204,9 +1536,11 @@ export default function App() {
                   MODERADO: !activeThreats.MODERADO,
                 })
               }
-              className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-xs transition-colors border ${activeThreats.MODERADO ? "border-yellow-500/80 bg-gray-800 text-white" : "border-gray-800 bg-gray-800/40 text-gray-500"}`}
+              className={`flex justify-between items-center px-3 py-1.5 rounded-lg text-xs transition-colors border cursor-pointer ${activeThreats.MODERADO ? "border-yellow-500/80 bg-gray-800 text-white" : "border-gray-800 bg-gray-800/40 text-gray-500"}`}
             >
-              <span className="font-bold">Moderado ({"<"}50 MW)</span>
+              <span className="font-bold">
+                {t.moderateLabel} ({"<"}50 MW)
+              </span>
               <span
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: activePalette.moderado.hex }}
@@ -1217,7 +1551,7 @@ export default function App() {
 
         <div className="bg-gray-800/90 p-3 rounded-xl border border-gray-700">
           <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1">
-            Distribución de Severidad
+            {t.severityDistTitle}
           </h3>
           <div className="h-28 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -1268,27 +1602,35 @@ export default function App() {
         {selectedAOI && (
           <div className="absolute top-4 left-4 z-20 max-w-[min(22rem,55%)] rounded-xl border border-orange-500/50 bg-gray-900/90 px-3 py-2 shadow-xl backdrop-blur-md">
             <div className="text-[9px] font-bold uppercase tracking-wider text-orange-300">
-              Área de interés activa
+              {t.activeAoiBadge}
             </div>
             <div className="truncate text-xs font-semibold text-white">
-              {selectedAOI.label}
+              {activeAoiText}
             </div>
             <div className="text-[10px] text-gray-400">
-              {rangeFilteredData.length.toLocaleString()} registros ·{" "}
-              {dateStart || "inicio"} a {dateEnd || "fin"}
+              {rangeFilteredData.length.toLocaleString()} {t.recordsWord} ·{" "}
+              {dateStart || "-"} {t.toWord} {dateEnd || "-"}
             </div>
           </div>
         )}
 
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
           <button
+            type="button"
+            onClick={toggleLanguage}
+            className="bg-gray-900/90 hover:bg-gray-800 text-orange-300 hover:text-white px-3 py-2 rounded-xl border border-gray-700 shadow-2xl text-xs font-mono font-bold backdrop-blur-md cursor-pointer transition-all"
+          >
+            🌐 {lang.toUpperCase()}
+          </button>
+          <button
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
             className="bg-gray-900/90 hover:bg-gray-800 text-white px-4 py-2 rounded-xl border border-orange-500/50 shadow-2xl text-xs font-bold flex items-center gap-2 backdrop-blur-md cursor-pointer transition-all"
           >
-            <span>📅 Calendario Armonizado</span>
+            <span>{t.harmonizedCalendarBtn}</span>
             {rangeDates.length > 0 && (
               <span className="bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-md font-mono">
-                Mediana AOI: {aoiSummary.median_daily_cells} celdas/día
+                {t.aoiMedianBadge} {aoiSummary.median_daily_cells}{" "}
+                {t.cellsPerDay}
               </span>
             )}
           </button>
@@ -1300,17 +1642,14 @@ export default function App() {
               <div>
                 <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
                   <span>
-                    📅 Calendario de Actividad de Quema —{" "}
-                    {selectedAOI?.label || "Vista global"}
+                    {t.modalHeaderTitle} {activeAoiText}
                   </span>
                   <span className="text-xs font-mono bg-orange-500/20 text-orange-300 px-2.5 py-0.5 rounded-full border border-orange-500/30">
-                    H3 Nivel {h3Resolution}
+                    H3 {t.levelWord} {h3Resolution}
                   </span>
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Actividad calculada con los registros armonizados del área y
-                  del periodo seleccionados. La anomalía se compara contra la
-                  mediana diaria de este mismo periodo.
+                  {t.modalHeaderDesc}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1318,24 +1657,24 @@ export default function App() {
                   onClick={() => setCalendarTab("HEATMAP")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${calendarTab === "HEATMAP" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
                 >
-                  🗓️ Mapa de Calor (Días)
+                  {t.tabHeatmap}
                 </button>
                 <button
                   onClick={() => setCalendarTab("ANOMALIES")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${calendarTab === "ANOMALIES" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
                 >
-                  📈 Anomalías vs. Mediana
+                  {t.tabAnomalies}
                 </button>
                 <button
                   onClick={() => setCalendarTab("MULTIYEAR")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${calendarTab === "MULTIYEAR" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
                 >
-                  🏛️ Régimen Multi-Anual
+                  {t.tabMultiyear}
                 </button>
                 <button
                   onClick={() => setIsCalendarOpen(false)}
                   className="ml-2 bg-gray-800 hover:bg-red-900/60 text-gray-300 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold border border-gray-700 cursor-pointer"
-                  title="Cerrar calendario"
+                  title={t.closeCalendar}
                 >
                   ✕
                 </button>
@@ -1345,57 +1684,58 @@ export default function App() {
             <div className="grid grid-cols-4 gap-3 my-3">
               <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
                 <div className="text-[11px] text-gray-400 uppercase font-semibold">
-                  Mediana del Periodo
+                  {t.kpiPeriodMedian}
                 </div>
                 <div className="text-xl font-extrabold text-white font-mono mt-0.5">
                   {aoiSummary.median_daily_cells}{" "}
                   <span className="text-xs font-normal text-gray-400">
-                    celdas H3/día
+                    {t.kpiCellsDay}
                   </span>
                 </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">
-                  Energía mediana: {aoiSummary.median_daily_frp} MW
+                  {t.kpiMedianEnergy} {aoiSummary.median_daily_frp} MW
                 </div>
               </div>
               <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
                 <div className="text-[11px] text-gray-400 uppercase font-semibold">
-                  Día Crítico (Pico)
+                  {t.kpiCriticalDay}
                 </div>
                 <div className="text-xl font-extrabold text-orange-400 font-mono mt-0.5">
                   {aoiSummary.peak_date}
                 </div>
                 <div className="text-[11px] text-red-300 mt-0.5">
-                  {aoiSummary.peak_cells} celdas (
+                  {aoiSummary.peak_cells} {t.cellsCount} (
                   {aoiSummary.peak_anomaly_pct > 0
                     ? `+${aoiSummary.peak_anomaly_pct}%`
                     : `${aoiSummary.peak_anomaly_pct}%`}{" "}
-                  sobre mediana)
+                  {t.kpiAboveMedian})
                 </div>
               </div>
               <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
                 <div className="text-[11px] text-gray-400 uppercase font-semibold">
-                  Reducción de Duplicados
+                  {t.kpiDedup}
                 </div>
                 <div className="text-xl font-extrabold text-emerald-400 font-mono mt-0.5">
                   {aoiSummary.harmonization_efficiency_pct}%
                 </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">
-                  {aoiSummary.total_raw_detections.toLocaleString()} focos →{" "}
+                  {aoiSummary.total_raw_detections.toLocaleString()}{" "}
+                  {t.kpiHotspots} →{" "}
                   {aoiSummary.total_harmonized_cell_days.toLocaleString()}{" "}
-                  celdas
+                  {t.cellsCount}
                 </div>
               </div>
               <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
                 <div className="text-[11px] text-gray-400 uppercase font-semibold">
-                  Fecha Activa en Mapa
+                  {t.kpiActiveDate}
                 </div>
                 <div className="text-xl font-extrabold text-blue-400 font-mono mt-0.5">
                   {currentDate || "-"}
                 </div>
                 <div className="text-[11px] text-gray-300 mt-0.5">
                   {currentDayStats
-                    ? `${currentDayStats.harmonized_cells} celdas (${currentDayStats.anomaly_pct > 0 ? "+" : ""}${currentDayStats.anomaly_pct}% vs mediana)`
-                    : "Selecciona un día"}
+                    ? `${currentDayStats.harmonized_cells} ${t.cellsCount} (${currentDayStats.anomaly_pct > 0 ? "+" : ""}${currentDayStats.anomaly_pct}% ${t.vsMedian})`
+                    : t.selectADay}
                 </div>
               </div>
             </div>
@@ -1404,11 +1744,10 @@ export default function App() {
               <div className="overflow-y-auto pr-1">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-gray-300 font-semibold">
-                    Haz clic en cualquier día del calendario para sincronizar el
-                    Mapa 3D:
+                    {t.heatmapInstruction}
                   </span>
                   <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                    <span>Menor actividad</span>
+                    <span>{t.lowerActivity}</span>
                     {activePalette.heatScale.map((c, idx) => (
                       <span
                         key={idx}
@@ -1416,7 +1755,7 @@ export default function App() {
                         style={{ backgroundColor: c }}
                       />
                     ))}
-                    <span>Periodo crítico</span>
+                    <span>{t.criticalPeriod}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
@@ -1468,7 +1807,7 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-64">
                 <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-800 flex flex-col">
                   <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
-                    Serie Diaria Armonizada vs. Mediana del Periodo
+                    {t.dailySeriesTitle}
                   </h4>
                   <div className="flex-1">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1494,14 +1833,14 @@ export default function App() {
                           stroke="#38bdf8"
                           strokeDasharray="4 4"
                           label={{
-                            value: "Mediana",
+                            value: t.medianRef,
                             fill: "#38bdf8",
                             fontSize: 10,
                           }}
                         />
                         <Bar
                           dataKey="harmonized_cells"
-                          name="Celdas H3 Activas"
+                          name={t.activeH3Cells}
                           fill={activePalette.alto.hex}
                           radius={[4, 4, 0, 0]}
                         />
@@ -1514,40 +1853,34 @@ export default function App() {
                   {selectedAOI ? (
                     <>
                       <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
-                        Comparativa histórica regional
+                        {t.regionalHistoryTitle}
                       </h4>
                       <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-700 p-5 text-center">
                         <div>
                           <div className="text-2xl">🧭</div>
                           <p className="mt-2 text-sm font-semibold text-gray-200">
-                            Referencia histórica regional no disponible
+                            {t.regionalHistoryUnavailable}
                           </p>
                           <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                            La API entrega 31 días de celdas armonizadas y un
-                            calendario histórico global. No contiene una serie
-                            multi-anual geolocalizada para calcular una mediana
-                            histórica exclusiva de este AOI.
+                            {t.regionalHistoryDesc}
                           </p>
                         </div>
                       </div>
                     </>
-                  ) : calendarData?.monthly_climatology ? (
+                  ) : localizedClimatology.length > 0 ? (
                     <>
                       <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
-                        Comparativa mensual global: actividad y referencia
-                        climatológica
+                        {t.globalMonthlyTitle}
                       </h4>
                       <div className="flex-1">
                         <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart
-                            data={calendarData.monthly_climatology}
-                          >
+                          <ComposedChart data={localizedClimatology}>
                             <CartesianGrid
                               strokeDasharray="3 3"
                               stroke="#374151"
                             />
                             <XAxis
-                              dataKey="month"
+                              dataKey="monthLabel"
                               stroke="#9ca3af"
                               fontSize={10}
                             />
@@ -1562,14 +1895,14 @@ export default function App() {
                             />
                             <Bar
                               dataKey="current_year"
-                              name="Actividad estimada/observada (celdas H3)"
+                              name={t.observedActivityBar}
                               fill={activePalette.extremo.hex}
                               radius={[4, 4, 0, 0]}
                             />
                             <Line
                               type="monotone"
                               dataKey="historical_median"
-                              name="Referencia mediana"
+                              name={t.medianReferenceLine}
                               stroke="#38bdf8"
                               strokeWidth={2}
                               dot={false}
@@ -1577,7 +1910,7 @@ export default function App() {
                             <Line
                               type="monotone"
                               dataKey="critical_threshold"
-                              name="Umbral de referencia"
+                              name={t.thresholdReferenceLine}
                               stroke="#facc15"
                               strokeDasharray="4 4"
                               strokeWidth={1.5}
@@ -1587,13 +1920,12 @@ export default function App() {
                         </ResponsiveContainer>
                       </div>
                       <p className="mt-1 text-[10px] text-gray-500">
-                        Referencia global del backend; no está filtrada por el
-                        rango ni representa una climatología regional observada.
+                        {t.globalRefFootnote}
                       </p>
                     </>
                   ) : (
                     <p className="m-auto text-xs text-gray-400">
-                      No hay datos de referencia mensual disponibles.
+                      {t.noMonthlyData}
                     </p>
                   )}
                 </div>
@@ -1605,13 +1937,10 @@ export default function App() {
                 <div className="max-w-xl">
                   <div className="text-2xl">🗺️</div>
                   <h3 className="mt-2 text-sm font-bold text-white">
-                    Matriz multi-anual no disponible para este AOI
+                    {t.multiyearUnavailableTitle}
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-gray-400">
-                    La matriz actual del backend es global y no conserva la
-                    ubicación de cada año/mes. Para no atribuir cifras globales
-                    a una región, esta vista se habilitará cuando exista un
-                    histórico multi-anual geolocalizado.
+                    {t.multiyearUnavailableDesc}
                   </p>
                 </div>
               </div>
@@ -1624,21 +1953,10 @@ export default function App() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="text-gray-400 border-b border-gray-800">
-                        <th className="py-2 px-2 text-left font-bold">Año</th>
-                        {[
-                          "Ene",
-                          "Feb",
-                          "Mar",
-                          "Abr",
-                          "May",
-                          "Jun",
-                          "Jul",
-                          "Ago",
-                          "Sep",
-                          "Oct",
-                          "Nov",
-                          "Dic",
-                        ].map((m) => (
+                        <th className="py-2 px-2 text-left font-bold">
+                          {t.yearCol}
+                        </th>
+                        {t.monthsShort.map((m) => (
                           <th
                             key={m}
                             className="py-2 px-2 text-center font-bold"
@@ -1657,7 +1975,7 @@ export default function App() {
                           <td className="py-1.5 px-2 font-mono font-bold text-gray-200">
                             {row.year}
                           </td>
-                          {row.months.map((mCell) => (
+                          {row.months.map((mCell, mIdx) => (
                             <td key={mCell.month} className="p-1">
                               <div
                                 style={{
@@ -1666,7 +1984,7 @@ export default function App() {
                                   ),
                                 }}
                                 className="rounded-md py-1.5 px-1 text-center font-mono text-[11px] text-white font-semibold border border-black/20"
-                                title={`${row.year} - ${mCell.month}: ${mCell.cells.toLocaleString()} celdas H3 armonizadas`}
+                                title={`${row.year} - ${t.monthsShort[mIdx] || mCell.month}: ${mCell.cells.toLocaleString()} ${t.harmonizedH3Cells}`}
                               >
                                 {mCell.cells.toLocaleString()}
                               </div>
@@ -1682,7 +2000,7 @@ export default function App() {
         )}
 
         <div className="absolute bottom-2 right-3 z-20 bg-gray-900/80 px-2.5 py-1 rounded text-[11px] text-gray-400 border border-gray-800 pointer-events-none">
-          Tiles © Esri, HERE, Garmin, USGS • Motor H3 Deck.gl
+          {t.attribution}
         </div>
 
         {hoverInfo && hoverInfo.object && (
@@ -1698,7 +2016,7 @@ export default function App() {
             </div>
             <div className="flex flex-col gap-1 text-xs border-t border-gray-800 pt-2">
               <div className="flex justify-between gap-4">
-                <span className="text-gray-400">Temp. Brillo Est.:</span>
+                <span className="text-gray-400">{t.tooltipTemp}</span>
                 <span className="font-bold text-red-300">
                   {Math.max(
                     0,
@@ -1708,19 +2026,19 @@ export default function App() {
                 </span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-gray-400">Confianza Promedio:</span>
+                <span className="text-gray-400">{t.tooltipConf}</span>
                 <span className="font-bold text-green-400">
                   {hoverInfo.object.avg_confidence.toFixed(0)}%
                 </span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-gray-400">Satélites:</span>
+                <span className="text-gray-400">{t.tooltipSats}</span>
                 <span className="font-bold text-right text-blue-300">
                   {hoverInfo.object.instruments}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-gray-400">Focos fusionados:</span>
+                <span className="text-gray-400">{t.tooltipMerged}</span>
                 <span className="font-bold">
                   {hoverInfo.object.point_count}
                 </span>
