@@ -25,6 +25,8 @@ import {
 const I18N = {
   es: {
     backHome: "← Portada",
+    openControls: "⚙️ Filtros y Controles",
+    viewMap: "🗺️ Ver Mapa",
     subtitle: "Calendario Armonizado & Motor H3",
     dataUnavailable: "Datos no disponibles",
     apiSynced: "API SINCRONIZADA",
@@ -92,6 +94,7 @@ const I18N = {
     recordsWord: "registros",
     toWord: "a",
     harmonizedCalendarBtn: "📅 Calendario Armonizado",
+    harmonizedCalendarShort: "📅 Calendario",
     aoiMedianBadge: "Mediana AOI:",
     cellsPerDay: "celdas/día",
     modalHeaderTitle: "📅 Calendario de Actividad de Quema —",
@@ -156,6 +159,8 @@ const I18N = {
   },
   en: {
     backHome: "← Home",
+    openControls: "⚙️ Filters & Controls",
+    viewMap: "🗺️ View Map",
     subtitle: "Harmonized Calendar & H3 Engine",
     dataUnavailable: "Data unavailable",
     apiSynced: "API SYNCHRONIZED",
@@ -222,6 +227,7 @@ const I18N = {
     recordsWord: "records",
     toWord: "to",
     harmonizedCalendarBtn: "📅 Harmonized Calendar",
+    harmonizedCalendarShort: "📅 Calendar",
     aoiMedianBadge: "AOI Median:",
     cellsPerDay: "cells/day",
     modalHeaderTitle: "📅 Burning Activity Calendar —",
@@ -628,6 +634,9 @@ export default function App() {
     useState({ cells: [], resolution: null });
   const [uniqueDates, setUniqueDates] = useState([]);
 
+  // Estado para abrir/cerrar el panel lateral en pantallas móviles
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Controles de tiempo
   const [currentDate, setCurrentDate] = useState("");
   const [dateStart, setDateStart] = useState("");
@@ -747,7 +756,7 @@ export default function App() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [h3Resolution]);
+  }, [h3Resolution, API_URL]);
 
   const rangeDates = useMemo(
     () =>
@@ -900,6 +909,7 @@ export default function App() {
     setAoiError("");
     setIsPlaying(false);
     focusBounds(region);
+    setIsMobileMenuOpen(false);
   };
 
   const applyCustomBounds = (event) => {
@@ -930,6 +940,7 @@ export default function App() {
     setAoiError("");
     setIsPlaying(false);
     focusBounds(bounds);
+    setIsMobileMenuOpen(false);
   };
 
   const selectHexagon = (record) => {
@@ -1081,18 +1092,31 @@ export default function App() {
   const activeAoiText = getAOILabel(selectedAOI);
 
   return (
-    <div className="flex h-screen w-full bg-gray-950 text-white overflow-hidden font-sans">
-      <div className="w-96 bg-gray-900/95 p-5 flex flex-col gap-3.5 z-10 shadow-2xl overflow-y-auto border-r border-gray-800">
+    <div className="relative flex h-dvh w-full bg-gray-950 text-white overflow-hidden font-sans">
+      {/* FONDO OSCURO SEMITRANSPARENTE EN MÓVIL CUANDO EL PANEL ESTÁ ABIERTO */}
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-30 bg-black/65 backdrop-blur-xs md:hidden"
+        />
+      )}
+
+      {/* PANEL LATERAL DE CONTROL (Cajón deslizable en móvil, fijo a la izquierda en escritorio) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-[88vw] max-w-sm bg-gray-900/95 backdrop-blur-xl p-4 md:p-5 flex flex-col gap-3.5 shadow-2xl overflow-y-auto border-r border-gray-800 transition-transform duration-300 ease-in-out md:static md:z-10 md:w-96 md:max-w-none md:translate-x-0 ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div>
           <div className="flex items-center justify-between gap-2">
-            <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
               AuraHex
             </h1>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={toggleLanguage}
-                className="text-[11px] font-mono font-bold text-orange-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded-md border border-orange-500/40 transition-colors cursor-pointer"
+                className="text-[11px] font-mono font-bold text-orange-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded-md border border-orange-500/40 transition-colors cursor-pointer"
                 title={
                   lang === "es" ? "Switch to English" : "Cambiar a Español"
                 }
@@ -1101,10 +1125,17 @@ export default function App() {
               </button>
               <a
                 href="/"
-                className="text-[11px] text-gray-400 hover:text-white bg-gray-800 px-2.5 py-1 rounded-md border border-gray-700 transition-colors"
+                className="text-[11px] text-gray-400 hover:text-white bg-gray-800 px-2 py-1 rounded-md border border-gray-700 transition-colors"
               >
                 {t.backHome}
               </a>
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="md:hidden text-[11px] font-bold text-white bg-orange-600 hover:bg-orange-500 px-2.5 py-1 rounded-md shadow-md cursor-pointer"
+              >
+                {t.viewMap} ✕
+              </button>
             </div>
           </div>
           <p className="text-gray-400 text-xs mt-0.5">{t.subtitle}</p>
@@ -1193,7 +1224,10 @@ export default function App() {
             {t.calendarPromo}
           </p>
           <button
-            onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+            onClick={() => {
+              setIsCalendarOpen(!isCalendarOpen);
+              setIsMobileMenuOpen(false);
+            }}
             className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-orange-600 hover:bg-orange-500 text-white transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>📅 {isCalendarOpen ? t.hideCalendar : t.openCalendar}</span>
@@ -1590,9 +1624,10 @@ export default function App() {
             NASA Space Apps Challenge • AuraHex
           </p>
         </div>
-      </div>
+      </aside>
 
-      <div className="flex-1 relative bg-gray-950">
+      {/* LIENZO 3D PRINCIPAL (100% visible en móviles y escritorio) */}
+      <div className="flex-1 relative h-full w-full bg-gray-950">
         <DeckGL
           viewState={viewState}
           controller={true}
@@ -1600,81 +1635,148 @@ export default function App() {
           onViewStateChange={onViewStateChange}
         />
 
-        {selectedAOI && (
-          <div className="absolute top-4 left-4 z-20 max-w-[min(22rem,55%)] rounded-xl border border-orange-500/50 bg-gray-900/90 px-3 py-2 shadow-xl backdrop-blur-md">
-            <div className="text-[9px] font-bold uppercase tracking-wider text-orange-300">
-              {t.activeAoiBadge}
-            </div>
-            <div className="truncate text-xs font-semibold text-white">
-              {activeAoiText}
-            </div>
-            <div className="text-[10px] text-gray-400">
-              {rangeFilteredData.length.toLocaleString()} {t.recordsWord} ·{" "}
-              {dateStart || "-"} {t.toWord} {dateEnd || "-"}
+        {/* BARRA SUPERIOR FLOTANTE RESPONSIVA */}
+        <div className="absolute top-3 inset-x-3 md:top-4 md:inset-x-4 z-20 flex flex-wrap items-start justify-between gap-2 pointer-events-none">
+          {/* Izquierda: Botón de menú móvil + Insignia de Área de Interés (AOI) */}
+          <div className="flex flex-col gap-2 pointer-events-auto max-w-[65%] sm:max-w-xs">
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden bg-gray-900/95 hover:bg-gray-800 text-white px-3 py-2 rounded-xl border border-orange-500/60 shadow-2xl text-xs font-bold flex items-center gap-2 backdrop-blur-md cursor-pointer"
+            >
+              <span>{t.openControls}</span>
+              <span className="bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono text-[10px]">
+                {filteredData.length}
+              </span>
+            </button>
+
+            {selectedAOI && (
+              <div className="rounded-xl border border-orange-500/50 bg-gray-900/90 px-3 py-2 shadow-xl backdrop-blur-md">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-orange-300">
+                    {t.activeAoiBadge}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearAOI}
+                    className="text-[10px] text-gray-400 hover:text-white font-bold cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="truncate text-xs font-semibold text-white">
+                  {activeAoiText}
+                </div>
+                <div className="text-[10px] text-gray-400">
+                  {rangeFilteredData.length.toLocaleString()} {t.recordsWord} ·{" "}
+                  {dateStart || "-"} {t.toWord} {dateEnd || "-"}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Derecha: Idioma + Botón del Calendario Armonizado */}
+          <div className="flex items-center gap-1.5 md:gap-2 pointer-events-auto">
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="bg-gray-900/90 hover:bg-gray-800 text-orange-300 hover:text-white px-2.5 py-2 md:px-3 rounded-xl border border-gray-700 shadow-2xl text-xs font-mono font-bold backdrop-blur-md cursor-pointer transition-all"
+            >
+              🌐 {lang.toUpperCase()}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+              className="bg-gray-900/90 hover:bg-gray-800 text-white px-3 py-2 md:px-4 rounded-xl border border-orange-500/50 shadow-2xl text-xs font-bold flex items-center gap-2 backdrop-blur-md cursor-pointer transition-all"
+            >
+              <span className="sm:hidden">{t.harmonizedCalendarShort}</span>
+              <span className="hidden sm:inline">
+                {t.harmonizedCalendarBtn}
+              </span>
+              {rangeDates.length > 0 && (
+                <span className="hidden lg:inline bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-md font-mono">
+                  {t.aoiMedianBadge} {aoiSummary.median_daily_cells}{" "}
+                  {t.cellsPerDay}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* BARRA INFERIOR RÁPIDA DE FECHA EN MÓVIL (Para usar el Time-Lapse sin abrir el panel) */}
+        {!isCalendarOpen && rangeDates.length > 0 && (
+          <div className="md:hidden absolute bottom-8 inset-x-3 z-20 bg-gray-900/90 backdrop-blur-md border border-gray-800 rounded-xl px-3 py-2 flex items-center gap-2.5 shadow-xl">
+            <button
+              type="button"
+              onClick={() => setIsPlaying(!isPlaying)}
+              disabled={rangeDates.length < 2}
+              className="bg-orange-600 hover:bg-orange-500 text-white rounded-full w-8 h-8 flex items-center justify-center shrink-0 text-xs shadow cursor-pointer disabled:opacity-40"
+            >
+              {isPlaying ? "⏸" : "▶"}
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-center text-[11px] font-mono">
+                <span className="font-bold text-orange-300">
+                  {currentDate || t.loading}
+                </span>
+                <span className="text-gray-400">H3 Nv.{h3Resolution}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, rangeDates.length - 1)}
+                value={Math.max(0, rangeDates.indexOf(currentDate))}
+                onChange={(e) => {
+                  setIsPlaying(false);
+                  setCurrentDate(rangeDates[Number(e.target.value)] || "");
+                }}
+                className="w-full accent-orange-500 mt-0.5 cursor-pointer"
+              />
             </div>
           </div>
         )}
 
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="bg-gray-900/90 hover:bg-gray-800 text-orange-300 hover:text-white px-3 py-2 rounded-xl border border-gray-700 shadow-2xl text-xs font-mono font-bold backdrop-blur-md cursor-pointer transition-all"
-          >
-            🌐 {lang.toUpperCase()}
-          </button>
-          <button
-            onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-            className="bg-gray-900/90 hover:bg-gray-800 text-white px-4 py-2 rounded-xl border border-orange-500/50 shadow-2xl text-xs font-bold flex items-center gap-2 backdrop-blur-md cursor-pointer transition-all"
-          >
-            <span>{t.harmonizedCalendarBtn}</span>
-            {rangeDates.length > 0 && (
-              <span className="bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-md font-mono">
-                {t.aoiMedianBadge} {aoiSummary.median_daily_cells}{" "}
-                {t.cellsPerDay}
-              </span>
-            )}
-          </button>
-        </div>
-
+        {/* MODAL DEL CALENDARIO ARMONIZADO (Responsivo en móvil y escritorio) */}
         {isCalendarOpen && fireData.length > 0 && (
-          <div className="absolute inset-x-6 bottom-8 z-30 bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl p-5 max-h-[78vh] flex flex-col overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-gray-800">
+          <div className="absolute inset-x-2 bottom-2 md:inset-x-6 md:bottom-8 z-30 bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl p-3.5 md:p-5 max-h-[84vh] md:max-h-[78vh] flex flex-col overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 md:gap-4 pb-2.5 md:pb-3 border-b border-gray-800">
               <div>
-                <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+                <h2 className="text-sm md:text-lg font-extrabold text-white flex flex-wrap items-center gap-2">
                   <span>
                     {t.modalHeaderTitle} {activeAoiText}
                   </span>
-                  <span className="text-xs font-mono bg-orange-500/20 text-orange-300 px-2.5 py-0.5 rounded-full border border-orange-500/30">
+                  <span className="text-[11px] md:text-xs font-mono bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full border border-orange-500/30">
                     H3 {t.levelWord} {h3Resolution}
                   </span>
                 </h2>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="hidden sm:block text-xs text-gray-400 mt-0.5">
                   {t.modalHeaderDesc}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCalendarTab("HEATMAP")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${calendarTab === "HEATMAP" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
-                >
-                  {t.tabHeatmap}
-                </button>
-                <button
-                  onClick={() => setCalendarTab("ANOMALIES")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${calendarTab === "ANOMALIES" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
-                >
-                  {t.tabAnomalies}
-                </button>
-                <button
-                  onClick={() => setCalendarTab("MULTIYEAR")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${calendarTab === "MULTIYEAR" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
-                >
-                  {t.tabMultiyear}
-                </button>
+              <div className="flex flex-wrap items-center gap-1.5 md:gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  <button
+                    onClick={() => setCalendarTab("HEATMAP")}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${calendarTab === "HEATMAP" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+                  >
+                    {t.tabHeatmap}
+                  </button>
+                  <button
+                    onClick={() => setCalendarTab("ANOMALIES")}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${calendarTab === "ANOMALIES" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+                  >
+                    {t.tabAnomalies}
+                  </button>
+                  <button
+                    onClick={() => setCalendarTab("MULTIYEAR")}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${calendarTab === "MULTIYEAR" ? "bg-orange-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+                  >
+                    {t.tabMultiyear}
+                  </button>
+                </div>
                 <button
                   onClick={() => setIsCalendarOpen(false)}
-                  className="ml-2 bg-gray-800 hover:bg-red-900/60 text-gray-300 hover:text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold border border-gray-700 cursor-pointer"
+                  className="bg-gray-800 hover:bg-red-900/60 text-gray-300 hover:text-white w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center font-bold border border-gray-700 cursor-pointer shrink-0"
                   title={t.closeCalendar}
                 >
                   ✕
@@ -1682,60 +1784,58 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-3 my-3">
-              <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
-                <div className="text-[11px] text-gray-400 uppercase font-semibold">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 my-2.5 md:my-3 shrink-0">
+              <div className="bg-gray-800/70 p-2.5 md:p-3 rounded-xl border border-gray-700/70">
+                <div className="text-[10px] md:text-[11px] text-gray-400 uppercase font-semibold">
                   {t.kpiPeriodMedian}
                 </div>
-                <div className="text-xl font-extrabold text-white font-mono mt-0.5">
+                <div className="text-base md:text-xl font-extrabold text-white font-mono mt-0.5">
                   {aoiSummary.median_daily_cells}{" "}
-                  <span className="text-xs font-normal text-gray-400">
+                  <span className="text-[10px] md:text-xs font-normal text-gray-400">
                     {t.kpiCellsDay}
                   </span>
                 </div>
-                <div className="text-[11px] text-gray-400 mt-0.5">
+                <div className="text-[10px] md:text-[11px] text-gray-400 mt-0.5">
                   {t.kpiMedianEnergy} {aoiSummary.median_daily_frp} MW
                 </div>
               </div>
-              <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
-                <div className="text-[11px] text-gray-400 uppercase font-semibold">
+              <div className="bg-gray-800/70 p-2.5 md:p-3 rounded-xl border border-gray-700/70">
+                <div className="text-[10px] md:text-[11px] text-gray-400 uppercase font-semibold">
                   {t.kpiCriticalDay}
                 </div>
-                <div className="text-xl font-extrabold text-orange-400 font-mono mt-0.5">
+                <div className="text-base md:text-xl font-extrabold text-orange-400 font-mono mt-0.5">
                   {aoiSummary.peak_date}
                 </div>
-                <div className="text-[11px] text-red-300 mt-0.5">
+                <div className="text-[10px] md:text-[11px] text-red-300 mt-0.5">
                   {aoiSummary.peak_cells} {t.cellsCount} (
                   {aoiSummary.peak_anomaly_pct > 0
                     ? `+${aoiSummary.peak_anomaly_pct}%`
-                    : `${aoiSummary.peak_anomaly_pct}%`}{" "}
-                  {t.kpiAboveMedian})
+                    : `${aoiSummary.peak_anomaly_pct}%`}
+                  )
                 </div>
               </div>
-              <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
-                <div className="text-[11px] text-gray-400 uppercase font-semibold">
+              <div className="bg-gray-800/70 p-2.5 md:p-3 rounded-xl border border-gray-700/70">
+                <div className="text-[10px] md:text-[11px] text-gray-400 uppercase font-semibold">
                   {t.kpiDedup}
                 </div>
-                <div className="text-xl font-extrabold text-emerald-400 font-mono mt-0.5">
+                <div className="text-base md:text-xl font-extrabold text-emerald-400 font-mono mt-0.5">
                   {aoiSummary.harmonization_efficiency_pct}%
                 </div>
-                <div className="text-[11px] text-gray-400 mt-0.5">
-                  {aoiSummary.total_raw_detections.toLocaleString()}{" "}
-                  {t.kpiHotspots} →{" "}
-                  {aoiSummary.total_harmonized_cell_days.toLocaleString()}{" "}
-                  {t.cellsCount}
+                <div className="text-[10px] md:text-[11px] text-gray-400 mt-0.5">
+                  {aoiSummary.total_raw_detections.toLocaleString()} →{" "}
+                  {aoiSummary.total_harmonized_cell_days.toLocaleString()}
                 </div>
               </div>
-              <div className="bg-gray-800/70 p-3 rounded-xl border border-gray-700/70">
-                <div className="text-[11px] text-gray-400 uppercase font-semibold">
+              <div className="bg-gray-800/70 p-2.5 md:p-3 rounded-xl border border-gray-700/70">
+                <div className="text-[10px] md:text-[11px] text-gray-400 uppercase font-semibold">
                   {t.kpiActiveDate}
                 </div>
-                <div className="text-xl font-extrabold text-blue-400 font-mono mt-0.5">
+                <div className="text-base md:text-xl font-extrabold text-blue-400 font-mono mt-0.5">
                   {currentDate || "-"}
                 </div>
-                <div className="text-[11px] text-gray-300 mt-0.5">
+                <div className="text-[10px] md:text-[11px] text-gray-300 mt-0.5">
                   {currentDayStats
-                    ? `${currentDayStats.harmonized_cells} ${t.cellsCount} (${currentDayStats.anomaly_pct > 0 ? "+" : ""}${currentDayStats.anomaly_pct}% ${t.vsMedian})`
+                    ? `${currentDayStats.harmonized_cells} ${t.cellsCount} (${currentDayStats.anomaly_pct > 0 ? "+" : ""}${currentDayStats.anomaly_pct}%)`
                     : t.selectADay}
                 </div>
               </div>
@@ -1743,23 +1843,23 @@ export default function App() {
 
             {calendarTab === "HEATMAP" && (
               <div className="overflow-y-auto pr-1">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-300 font-semibold">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <span className="text-[11px] md:text-xs text-gray-300 font-semibold">
                     {t.heatmapInstruction}
                   </span>
-                  <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                  <div className="flex items-center gap-1.5 text-[10px] md:text-[11px] text-gray-400">
                     <span>{t.lowerActivity}</span>
                     {activePalette.heatScale.map((c, idx) => (
                       <span
                         key={idx}
-                        className="w-4 h-3 rounded-sm inline-block border border-gray-700"
+                        className="w-3.5 h-2.5 md:w-4 md:h-3 rounded-sm inline-block border border-gray-700"
                         style={{ backgroundColor: c }}
                       />
                     ))}
                     <span>{t.criticalPeriod}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-1.5 md:gap-2">
                   {aoiCalendar.daily.map((dayItem) => {
                     const dailyRange =
                       aoiSummary.max_daily_cells - aoiSummary.min_daily_cells;
@@ -1784,15 +1884,15 @@ export default function App() {
                           }
                         }}
                         style={{ backgroundColor: bg }}
-                        className={`p-2.5 rounded-xl text-left transition-all cursor-pointer border ${isSelected ? "ring-2 ring-white border-white scale-[1.03]" : "border-gray-700/80 hover:border-gray-400"}`}
+                        className={`p-2 md:p-2.5 rounded-xl text-left transition-all cursor-pointer border ${isSelected ? "ring-2 ring-white border-white scale-[1.02]" : "border-gray-700/80 hover:border-gray-400"}`}
                       >
-                        <div className="text-[11px] font-mono font-bold text-white drop-shadow">
+                        <div className="text-[10px] md:text-[11px] font-mono font-bold text-white drop-shadow">
                           {dayItem.date.slice(5)}
                         </div>
-                        <div className="text-sm font-extrabold text-white mt-0.5 drop-shadow">
+                        <div className="text-xs md:text-sm font-extrabold text-white mt-0.5 drop-shadow">
                           {dayItem.harmonized_cells}
                         </div>
-                        <div className="text-[10px] font-mono text-gray-100 opacity-90">
+                        <div className="text-[9px] md:text-[10px] font-mono text-gray-100 opacity-90">
                           {dayItem.anomaly_pct > 0
                             ? `+${dayItem.anomaly_pct}%`
                             : `${dayItem.anomaly_pct}%`}
@@ -1805,8 +1905,8 @@ export default function App() {
             )}
 
             {calendarTab === "ANOMALIES" && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-64">
-                <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-800 flex flex-col">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto pr-1">
+                <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-800 flex flex-col h-56 md:h-64">
                   <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
                     {t.dailySeriesTitle}
                   </h4>
@@ -1850,19 +1950,19 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-800 flex flex-col">
+                <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-800 flex flex-col h-56 md:h-64">
                   {selectedAOI ? (
                     <>
                       <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
                         {t.regionalHistoryTitle}
                       </h4>
-                      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-700 p-5 text-center">
+                      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-700 p-4 text-center">
                         <div>
-                          <div className="text-2xl">🧭</div>
-                          <p className="mt-2 text-sm font-semibold text-gray-200">
+                          <div className="text-xl md:text-2xl">🧭</div>
+                          <p className="mt-1 text-xs md:text-sm font-semibold text-gray-200">
                             {t.regionalHistoryUnavailable}
                           </p>
-                          <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                          <p className="mt-1 text-[11px] md:text-xs leading-relaxed text-gray-400">
                             {t.regionalHistoryDesc}
                           </p>
                         </div>
@@ -2000,22 +2100,28 @@ export default function App() {
           </div>
         )}
 
-        <div className="absolute bottom-2 right-3 z-20 bg-gray-900/80 px-2.5 py-1 rounded text-[11px] text-gray-400 border border-gray-800 pointer-events-none">
+        <div className="absolute bottom-1.5 right-2 md:bottom-2 md:right-3 z-10 bg-gray-900/80 px-2 py-0.5 md:px-2.5 md:py-1 rounded text-[10px] md:text-[11px] text-gray-400 border border-gray-800 pointer-events-none">
           {t.attribution}
         </div>
 
         {hoverInfo && hoverInfo.object && (
           <div
-            className="absolute z-50 bg-gray-900/95 backdrop-blur-md border border-gray-700 text-white p-3.5 rounded-xl shadow-2xl pointer-events-none transform -translate-x-1/2 -translate-y-full -mt-3 min-w-56"
-            style={{ left: hoverInfo.x, top: hoverInfo.y }}
+            className="absolute z-50 bg-gray-900/95 backdrop-blur-md border border-gray-700 text-white p-3 rounded-xl shadow-2xl pointer-events-none transform -translate-x-1/2 -translate-y-full -mt-3 min-w-52 max-w-[90vw]"
+            style={{
+              left: Math.min(
+                Math.max(hoverInfo.x, 120),
+                window.innerWidth - 120,
+              ),
+              top: Math.max(hoverInfo.y, 140),
+            }}
           >
             <div className="text-[11px] font-mono text-gray-400 mb-0.5">
               H3 (Res {h3Resolution}): {hoverInfo.object.h3_index}
             </div>
-            <div className="text-xl font-extrabold text-orange-400 mb-2">
+            <div className="text-lg md:text-xl font-extrabold text-orange-400 mb-1.5">
               {hoverInfo.object.total_frp.toFixed(1)} MW (FRP)
             </div>
-            <div className="flex flex-col gap-1 text-xs border-t border-gray-800 pt-2">
+            <div className="flex flex-col gap-1 text-xs border-t border-gray-800 pt-1.5">
               <div className="flex justify-between gap-4">
                 <span className="text-gray-400">{t.tooltipTemp}</span>
                 <span className="font-bold text-red-300">
