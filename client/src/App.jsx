@@ -503,17 +503,11 @@ export default function App() {
       const hasNoaa20 =
         instrumentsStr.includes("NOAA-20") ||
         instrumentsStr.includes("N20") ||
-        instrumentsStr
-          .split(",")
-          .map((s) => s.trim())
-          .includes("1");
+        instrumentsStr.split(",").map((value) => value.trim()).includes("1");
       const hasNoaa21 =
         instrumentsStr.includes("NOAA-21") ||
         instrumentsStr.includes("N21") ||
-        instrumentsStr
-          .split(",")
-          .map((s) => s.trim())
-          .includes("2");
+        instrumentsStr.split(",").map((value) => value.trim()).includes("2");
 
       const satMatch =
         (activeSats.MODIS && hasModis) ||
@@ -523,14 +517,11 @@ export default function App() {
       const isExtremo = d.total_frp > 150;
       const isAlto = d.total_frp > 50 && d.total_frp <= 150;
       const isModerado = d.total_frp <= 50;
-
-      let threatMatch = false;
-      if (activeThreats.EXTREMO && isExtremo) threatMatch = true;
-      if (activeThreats.ALTO && isAlto) threatMatch = true;
-      if (activeThreats.MODERADO && isModerado) threatMatch = true;
-
-      const dateMatch = currentDate ? d.acq_date === currentDate : true;
-
+      const threatMatch =
+        (activeThreats.EXTREMO && isExtremo) ||
+        (activeThreats.ALTO && isAlto) ||
+        (activeThreats.MODERADO && isModerado);
+      const dateMatch = currentDate ? d.acq_date === currentDate : false;
       return satMatch && threatMatch && dateMatch;
     });
   }, [rangeFilteredData, activeSats, activeThreats, currentDate]);
