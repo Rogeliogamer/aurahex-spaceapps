@@ -3,7 +3,8 @@ import { downloadFireCsv } from "./fireCsv.js";
 import React, { useState, useEffect, useMemo } from "react";
 import DeckGL from "@deck.gl/react";
 import { H3HexagonLayer, TileLayer } from "@deck.gl/geo-layers";
-import { BitmapLayer } from "@deck.gl/layers";
+import { BitmapLayer, PolygonLayer } from "@deck.gl/layers";
+import { cellToLatLng, cellToBoundary } from "h3-js";
 import {
   PieChart,
   Pie,
@@ -63,6 +64,14 @@ const H3_SCALE_INFO = {
   8: "~0.74 km² (Local)",
 };
 
+function resolutionForZoom(zoom) {
+  if (zoom < 4) return 4;
+  if (zoom < 5.8) return 5;
+  if (zoom < 7.5) return 6;
+  if (zoom < 9.2) return 7;
+  return 8;
+}
+
 const INITIAL_VIEW_STATE = {
   longitude: -101.0,
   latitude: 25.5,
@@ -71,15 +80,192 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
+// Regiones rápidas de exploración. Son cajas geográficas aproximadas, no límites administrativos oficiales.
+const QUICK_REGIONS = [
+  { id: "northwest-mx", label: "Noroeste de México", north: 32.8, south: 22.0, west: -117.2, east: -105.0 },
+  { id: "northeast-mx", label: "Noreste de México", north: 30.5, south: 22.0, west: -105.0, east: -97.0 },
+  { id: "west-bajio-mx", label: "Occidente y Bajío", north: 24.5, south: 18.0, west: -106.0, east: -99.0 },
+  { id: "south-southeast-mx", label: "Centro-sur y sureste", north: 21.0, south: 14.5, west: -102.0, east: -92.0 },
+  { id: "yucatan-mx", label: "Península de Yucatán", north: 22.8, south: 17.5, west: -92.0, east: -86.5 },
+  { id: "california-us", label: "California", north: 42.1, south: 32.5, west: -124.5, east: -114.1 },
+];
+
+function isLongitudeInside(longitude, west, east) {
+  // También permite cajas que cruzan el meridiano 180°.
+  return west <= east
+    ? longitude >= west && longitude <= east
+    : longitude >= west || longitude <= east;
+}
+
+function pointInPolygon(point, polygon) {
+  const [x, y] = point;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    const intersects =
+      yi > y !== yj > y &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi || Number.EPSILON) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function isCellInsideAOI(record, aoi) {
+  if (!aoi) return true;
+  try {
+    const [latitude, longitude] = cellToLatLng(record.h3_index);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+
+    if (aoi.type === "hexagon") {
+      return pointInPolygon([longitude, latitude], aoi.boundary);
+    }
+
+    return (
+      latitude >= aoi.south &&
+      latitude <= aoi.north &&
+      isLongitudeInside(longitude, aoi.west, aoi.east)
+    );
+  } catch (error) {
+    console.warn("No se pudo evaluar la celda H3:", record.h3_index, error);
+    return false;
+  }
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function buildAOICalendar(records, dates) {
+  const grouped = new Map();
+  for (const record of records) {
+    const current = grouped.get(record.acq_date) || {
+      harmonized_cells: 0,
+      raw_hotspots: 0,
+      total_frp: 0,
+      extreme_cells: 0,
+      high_cells: 0,
+      multi_sensor_cells: 0,
+    };
+    current.harmonized_cells += 1;
+    current.raw_hotspots += Number(record.point_count) || 0;
+    current.total_frp += Number(record.total_frp) || 0;
+    if (record.total_frp > 150) current.extreme_cells += 1;
+    else if (record.total_frp > 50) current.high_cells += 1;
+    if (String(record.instruments || "").includes(",")) current.multi_sensor_cells += 1;
+    grouped.set(record.acq_date, current);
+  }
+
+  // Incluye también los días sin detecciones dentro del rango para no ocultar días en cero.
+  const baseDays = dates.map((date) => ({
+    date,
+    ...(grouped.get(date) || {
+      harmonized_cells: 0,
+      raw_hotspots: 0,
+      total_frp: 0,
+      extreme_cells: 0,
+      high_cells: 0,
+      multi_sensor_cells: 0,
+    }),
+  }));
+  const medianCells = median(baseDays.map((day) => day.harmonized_cells));
+  const medianFrp = median(baseDays.map((day) => day.total_frp));
+  const daily = baseDays.map((day) => {
+    const anomaly = ((day.harmonized_cells - medianCells) / Math.max(1, medianCells)) * 100;
+    return {
+      ...day,
+      total_frp: Number(day.total_frp.toFixed(1)),
+      anomaly_pct: Number(anomaly.toFixed(1)),
+      status: anomaly >= 35 ? "CRITICO" : anomaly >= 10 ? "ELEVADO" : anomaly <= -25 ? "BAJO" : "NORMAL",
+    };
+  });
+
+  const peak = daily.reduce((best, day) =>
+    !best || day.harmonized_cells > best.harmonized_cells ? day : best, null);
+  const totalRaw = daily.reduce((sum, day) => sum + day.raw_hotspots, 0);
+  const totalHarmonized = daily.reduce((sum, day) => sum + day.harmonized_cells, 0);
+  const minCells = daily.length ? Math.min(...daily.map((day) => day.harmonized_cells)) : 0;
+  const maxCells = daily.length ? Math.max(...daily.map((day) => day.harmonized_cells)) : 0;
+
+  return {
+    daily,
+    summary: {
+      median_daily_cells: Number(medianCells.toFixed(1)),
+      median_daily_frp: Number(medianFrp.toFixed(1)),
+      min_daily_cells: minCells,
+      max_daily_cells: maxCells,
+      total_raw_detections: totalRaw,
+      total_harmonized_cell_days: totalHarmonized,
+      harmonization_efficiency_pct: Number(((1 - totalHarmonized / Math.max(1, totalRaw)) * 100).toFixed(1)),
+      peak_date: peak?.date || "-",
+      peak_cells: peak?.harmonized_cells || 0,
+      peak_anomaly_pct: peak?.anomaly_pct || 0,
+    },
+  };
+}
+
+function getAOIPolygon(aoi) {
+  if (!aoi) return null;
+  if (aoi.type === "hexagon") return aoi.boundary;
+  return [
+    [aoi.west, aoi.south],
+    [aoi.east, aoi.south],
+    [aoi.east, aoi.north],
+    [aoi.west, aoi.north],
+  ];
+}
+
+function downloadAOIRangeCSV(records, resolution, startDate, endDate, aoiLabel) {
+  const headers = [
+    "aoi", "h3_index", "acq_date", "total_frp_mw",
+    "avg_confidence", "avg_brightness", "point_count", "instruments",
+  ];
+  const escapeCSV = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const rows = records.map((record) => [
+    aoiLabel || "Vista global", record.h3_index, record.acq_date,
+    record.total_frp, record.avg_confidence, record.avg_brightness,
+    record.point_count, record.instruments,
+  ]);
+  const csv = [headers, ...rows]
+    .map((row) => row.map(escapeCSV).join(","))
+    .join("\r\n");
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const safeLabel = String(aoiLabel || "global")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  link.href = url;
+  link.download = `aurahex-${safeLabel || "global"}-h3-${resolution}-${startDate || "inicio"}-${endDate || "fin"}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
   const [{ cells: fireData, resolution: loadedResolution }, setFireData] =
     useState({ cells: [], resolution: null });
   const [uniqueDates, setUniqueDates] = useState([]);
-  const [currentDateIndex, setCurrentDateIndex] = useState(0);
+  const [currentDate, setCurrentDate] = useState("");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [hoverInfo, setHoverInfo] = useState(null);
+
+  // Estado del Sprint 3: Área de Interés (AOI) y cámara controlada.
+  const [selectedAOI, setSelectedAOI] = useState(null);
+  const [boundsDraft, setBoundsDraft] = useState({ north: "", south: "", west: "", east: "" });
+  const [aoiError, setAoiError] = useState("");
+  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
 
   // Estado del Mapa Base, Rampa de Color y Zoom Semántico
   const [mapTheme, setMapTheme] = useState("DARK");
@@ -109,19 +295,14 @@ export default function App() {
   const activePalette = COLOR_RAMPS[colorRamp];
 
   // 1. Escucha del zoom de la cámara
-  const onViewStateChange = ({ viewState }) => {
-    const roundedZoom = Math.round(viewState.zoom * 10) / 10;
+  const onViewStateChange = ({ viewState: nextViewState }) => {
+    setViewState(nextViewState);
+    const roundedZoom = Math.round(nextViewState.zoom * 10) / 10;
     if (roundedZoom !== cameraZoom) {
       setCameraZoom(roundedZoom);
     }
 
-    let newRes = 5;
-    if (viewState.zoom < 4) newRes = 4;
-    else if (viewState.zoom >= 4 && viewState.zoom < 5.8) newRes = 5;
-    else if (viewState.zoom >= 5.8 && viewState.zoom < 7.5) newRes = 6;
-    else if (viewState.zoom >= 7.5 && viewState.zoom < 9.2) newRes = 7;
-    else if (viewState.zoom >= 9.2) newRes = 8;
-
+    const newRes = resolutionForZoom(nextViewState.zoom);
     if (newRes !== targetResolution) {
       setTargetResolution(newRes);
     }
@@ -170,14 +351,13 @@ export default function App() {
         setFireData({ cells: data, resolution: h3Resolution });
         if (calData) setCalendarData(calData);
 
-        const dates = [...new Set(data.map((d) => d.acq_date))].sort();
+        const dates = [...new Set(data.map((d) => d.acq_date).filter(Boolean))].sort();
         setUniqueDates(dates);
-        setCurrentDateIndex((prev) =>
-          dates.length > 0 && prev >= dates.length ? dates.length - 1 : prev,
+        setDateStart((previous) => previous || dates[0] || "");
+        setDateEnd((previous) => previous || dates.at(-1) || "");
+        setCurrentDate((previous) =>
+          dates.includes(previous) ? previous : dates.at(-1) || "",
         );
-        if (uniqueDates.length === 0 && dates.length > 0) {
-          setCurrentDateIndex(dates.length - 1);
-        }
       })
       .catch((error) => {
         if (!active) return;
@@ -198,21 +378,60 @@ export default function App() {
     };
   }, [h3Resolution]);
 
-  // 4. Reloj del Reproductor Time-Lapse
-  useEffect(() => {
-    let interval;
-    if (isPlaying && uniqueDates.length > 0) {
-      interval = setInterval(() => {
-        setCurrentDateIndex((prev) => (prev + 1) % uniqueDates.length);
-      }, 1800);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, uniqueDates.length]);
+  // 4. Fechas disponibles dentro del rango seleccionado.
+  const rangeDates = useMemo(
+    () => uniqueDates.filter((date) => (!dateStart || date >= dateStart) && (!dateEnd || date <= dateEnd)),
+    [uniqueDates, dateStart, dateEnd],
+  );
 
-  // 5. Filtrado espacial y temporal
-  const currentDate = uniqueDates[currentDateIndex];
+  // 5. Filtrado espacial: el centro de cada celda H3 determina si pertenece al AOI.
+  const spatiallyFilteredData = useMemo(
+    () => fireData.filter((record) => isCellInsideAOI(record, selectedAOI)),
+    [fireData, selectedAOI],
+  );
+
+  const rangeFilteredData = useMemo(
+    () => spatiallyFilteredData.filter((record) =>
+      (!dateStart || record.acq_date >= dateStart) &&
+      (!dateEnd || record.acq_date <= dateEnd),
+    ),
+    [spatiallyFilteredData, dateStart, dateEnd],
+  );
+
+  // Mantiene una fecha válida al cambiar AOI o rango. Los días sin focos permanecen en el time-lapse.
+  useEffect(() => {
+    if (rangeDates.length === 0) {
+      setCurrentDate("");
+      setIsPlaying(false);
+      return;
+    }
+    if (!rangeDates.includes(currentDate)) {
+      setCurrentDate(rangeDates.at(-1));
+    }
+  }, [rangeDates, currentDate]);
+
+  // 6. Reloj del reproductor, limitado al rango temporal seleccionado.
+  useEffect(() => {
+    if (!isPlaying || rangeDates.length < 2) return undefined;
+    const interval = setInterval(() => {
+      setCurrentDate((previous) => {
+        const currentIndex = rangeDates.indexOf(previous);
+        return rangeDates[(currentIndex + 1 + rangeDates.length) % rangeDates.length];
+      });
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [isPlaying, rangeDates]);
+
+  // Calendario recalculado exclusivamente con los registros del AOI y del rango elegido.
+  const aoiCalendar = useMemo(
+    () => buildAOICalendar(rangeFilteredData, rangeDates),
+    [rangeFilteredData, rangeDates],
+  );
+  const aoiSummary = aoiCalendar.summary;
+
+  // 7. Filtros de sensor, amenaza y día aplicados a las celdas visibles del mapa.
   const filteredData = useMemo(() => {
-    return fireData.filter((d) => {
+    return rangeFilteredData.filter((d) => {
       const instrumentsStr = String(d.instruments).toUpperCase();
       const hasModis =
         instrumentsStr.includes("MODIS") ||
@@ -223,17 +442,11 @@ export default function App() {
       const hasNoaa20 =
         instrumentsStr.includes("NOAA-20") ||
         instrumentsStr.includes("N20") ||
-        instrumentsStr
-          .split(",")
-          .map((s) => s.trim())
-          .includes("1");
+        instrumentsStr.split(",").map((value) => value.trim()).includes("1");
       const hasNoaa21 =
         instrumentsStr.includes("NOAA-21") ||
         instrumentsStr.includes("N21") ||
-        instrumentsStr
-          .split(",")
-          .map((s) => s.trim())
-          .includes("2");
+        instrumentsStr.split(",").map((value) => value.trim()).includes("2");
 
       const satMatch =
         (activeSats.MODIS && hasModis) ||
@@ -243,17 +456,14 @@ export default function App() {
       const isExtremo = d.total_frp > 150;
       const isAlto = d.total_frp > 50 && d.total_frp <= 150;
       const isModerado = d.total_frp <= 50;
-
-      let threatMatch = false;
-      if (activeThreats.EXTREMO && isExtremo) threatMatch = true;
-      if (activeThreats.ALTO && isAlto) threatMatch = true;
-      if (activeThreats.MODERADO && isModerado) threatMatch = true;
-
-      const dateMatch = currentDate ? d.acq_date === currentDate : true;
-
+      const threatMatch =
+        (activeThreats.EXTREMO && isExtremo) ||
+        (activeThreats.ALTO && isAlto) ||
+        (activeThreats.MODERADO && isModerado);
+      const dateMatch = currentDate ? d.acq_date === currentDate : false;
       return satMatch && threatMatch && dateMatch;
     });
-  }, [fireData, activeSats, activeThreats, currentDate]);
+  }, [rangeFilteredData, activeSats, activeThreats, currentDate]);
 
   const exportPending =
     isRecalculating ||
@@ -264,15 +474,94 @@ export default function App() {
     !exportPending &&
     Boolean(currentDate) &&
     filteredData.length > 0;
+  const canExportRangeCsv =
+    !dataError &&
+    !exportPending &&
+    rangeFilteredData.length > 0;
 
-  // Estadísticas del día seleccionado en el Calendario
-  const currentDayStats = useMemo(() => {
-    if (!calendarData?.daily?.length) return null;
-    return (
-      calendarData.daily.find((d) => d.date === currentDate) ||
-      calendarData.daily[calendarData.daily.length - 1]
-    );
-  }, [calendarData, currentDate]);
+  const currentDayStats = useMemo(
+    () => aoiCalendar.daily.find((day) => day.date === currentDate) || null,
+    [aoiCalendar, currentDate],
+  );
+
+  // Acciones del AOI.
+  const focusBounds = (bounds) => {
+    const adjustedEast = bounds.west <= bounds.east ? bounds.east : bounds.east + 360;
+    let longitude = (bounds.west + adjustedEast) / 2;
+    if (longitude > 180) longitude -= 360;
+    const latitude = (bounds.north + bounds.south) / 2;
+    const span = Math.max(bounds.north - bounds.south, adjustedEast - bounds.west);
+    const zoom = Math.max(5.8, Math.min(10, Math.log2(360 / Math.max(span, 0.01)) - 1.5));
+    setViewState((previous) => ({ ...previous, longitude, latitude, zoom }));
+    setCameraZoom(Math.round(zoom * 10) / 10);
+    setTargetResolution(resolutionForZoom(zoom));
+  };
+
+  const applyQuickRegion = (regionId) => {
+    const region = QUICK_REGIONS.find((item) => item.id === regionId);
+    if (!region) return;
+    setSelectedAOI({ type: "bounds", regionId: region.id, ...region });
+    setBoundsDraft({
+      north: String(region.north),
+      south: String(region.south),
+      west: String(region.west),
+      east: String(region.east),
+    });
+    setAoiError("");
+    setIsPlaying(false);
+    focusBounds(region);
+  };
+
+  const applyCustomBounds = (event) => {
+    event.preventDefault();
+    const bounds = {
+      north: Number(boundsDraft.north),
+      south: Number(boundsDraft.south),
+      west: Number(boundsDraft.west),
+      east: Number(boundsDraft.east),
+    };
+    const valid = Object.values(bounds).every(Number.isFinite) &&
+      bounds.north <= 90 && bounds.north >= -90 &&
+      bounds.south <= 90 && bounds.south >= -90 &&
+      bounds.north > bounds.south &&
+      bounds.west <= 180 && bounds.west >= -180 &&
+      bounds.east <= 180 && bounds.east >= -180 &&
+      bounds.west !== bounds.east;
+    if (!valid) {
+      setAoiError("Revisa los límites: latitudes entre -90 y 90, longitudes entre -180 y 180 y Norte mayor que Sur.");
+      return;
+    }
+    setSelectedAOI({ type: "bounds", label: "Caja de coordenadas", ...bounds });
+    setAoiError("");
+    setIsPlaying(false);
+    focusBounds(bounds);
+  };
+
+  const selectHexagon = (record) => {
+    try {
+      const [latitude, longitude] = cellToLatLng(record.h3_index);
+      const boundary = cellToBoundary(record.h3_index).map(([lat, lon]) => [lon, lat]);
+      setSelectedAOI({
+        type: "hexagon",
+        label: `Hexágono ${record.h3_index}`,
+        h3Index: record.h3_index,
+        boundary,
+      });
+      setIsPlaying(false);
+      setHoverInfo(null);
+      const zoom = Math.max(viewState.zoom, 8);
+      setViewState((previous) => ({ ...previous, longitude, latitude, zoom }));
+      setCameraZoom(Math.round(zoom * 10) / 10);
+      setTargetResolution(resolutionForZoom(zoom));
+    } catch (error) {
+      console.error("No se pudo seleccionar el hexágono:", error);
+    }
+  };
+
+  const clearAOI = () => {
+    setSelectedAOI(null);
+    setAoiError("");
+  };
 
   // 6. Estadísticas para la gráfica de anillo
   const chartData = useMemo(() => {
@@ -353,12 +642,33 @@ export default function App() {
       },
       getElevation: (d) => d.total_frp,
       onHover: (info) => setHoverInfo(info),
+      onClick: (info) => {
+        if (info.object) selectHexagon(info.object);
+      },
       updateTriggers: {
         getFillColor: [filteredData, colorRamp],
         getElevation: [filteredData, h3Resolution],
       },
     }),
   ];
+
+  const selectedAOIPolygon = getAOIPolygon(selectedAOI);
+  if (selectedAOIPolygon) {
+    layers.push(
+      new PolygonLayer({
+        id: "aoi-selection-boundary",
+        data: [{ polygon: selectedAOIPolygon }],
+        getPolygon: (item) => item.polygon,
+        stroked: true,
+        filled: true,
+        getFillColor: [249, 115, 22, 22],
+        getLineColor: [251, 146, 60, 245],
+        getLineWidth: 3,
+        lineWidthMinPixels: 2,
+        pickable: false,
+      }),
+    );
+  }
 
   if (initialLoading) return <MapLoading />;
 
@@ -414,7 +724,15 @@ export default function App() {
             }
             className="mt-2 w-full rounded-lg border border-orange-500/50 bg-orange-600/20 px-3 py-2 text-xs font-bold text-orange-200 transition-colors enabled:cursor-pointer enabled:hover:bg-orange-600/35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <span aria-hidden="true">⬇️ </span>Exportar CSV Filtrado
+            <span aria-hidden="true">⬇️ </span>Exportar CSV del día activo
+          </button>
+          <button
+            type="button"
+            disabled={!canExportRangeCsv}
+            onClick={() => downloadAOIRangeCSV(rangeFilteredData, loadedResolution, dateStart, dateEnd, selectedAOI?.label)}
+            className="mt-1 w-full rounded-lg border border-cyan-500/50 bg-cyan-600/15 px-3 py-2 text-xs font-bold text-cyan-100 transition-colors enabled:cursor-pointer enabled:hover:bg-cyan-600/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span aria-hidden="true">⬇️ </span>Exportar CSV del AOI y periodo
           </button>
           {!dataError && !canExportCsv && (
             <p className="mt-1 text-[11px] text-gray-400">
@@ -422,6 +740,9 @@ export default function App() {
                 ? "Actualizando resolución H3…"
                 : "No hay celdas para exportar con estos filtros."}
             </p>
+          )}
+          {!dataError && !canExportRangeCsv && !exportPending && (
+            <p className="mt-1 text-[10px] text-gray-500">No hay registros dentro del AOI y rango de fechas para exportar.</p>
           )}
         </div>
 
@@ -464,6 +785,130 @@ export default function App() {
             </span>
           </button>
         </div>
+
+        {/* SPRINT 3: SELECTOR DE ÁREA DE INTERÉS Y RANGO TEMPORAL */}
+        <section className="rounded-xl border border-cyan-500/30 bg-gray-800/80 p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+              📍 Exploración por Área (AOI)
+            </h3>
+            {selectedAOI && (
+              <button type="button" onClick={clearAOI} className="text-[10px] font-semibold text-orange-300 hover:text-white">
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="quick-region" className="mb-1 block text-[10px] font-semibold text-gray-400">
+              Regiones rápidas de exploración
+            </label>
+            <select
+              id="quick-region"
+              value={selectedAOI?.regionId || ""}
+              onChange={(event) => applyQuickRegion(event.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-2.5 py-2 text-xs text-white outline-none focus:border-cyan-400"
+            >
+              <option value="">Seleccionar región…</option>
+              {QUICK_REGIONS.map((region) => (
+                <option key={region.id} value={region.id}>{region.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[10px] leading-relaxed text-gray-500">
+              Áreas rectangulares aproximadas para exploración; no representan límites administrativos oficiales ni zonas críticas detectadas automáticamente.
+            </p>
+          </div>
+
+          <form onSubmit={applyCustomBounds} className="space-y-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              Caja de coordenadas (Lat/Lon)
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: "north", label: "Norte / Lat. máx.", min: -90, max: 90 },
+                { key: "south", label: "Sur / Lat. mín.", min: -90, max: 90 },
+                { key: "west", label: "Oeste / Lon. mín.", min: -180, max: 180 },
+                { key: "east", label: "Este / Lon. máx.", min: -180, max: 180 },
+              ].map((field) => (
+                <label key={field.key} className="text-[10px] text-gray-400">
+                  {field.label}
+                  <input
+                    type="number"
+                    step="any"
+                    min={field.min}
+                    max={field.max}
+                    required
+                    value={boundsDraft[field.key]}
+                    onChange={(event) => setBoundsDraft((previous) => ({ ...previous, [field.key]: event.target.value }))}
+                    placeholder={field.key === "north" ? "32.7" : field.key === "south" ? "14.5" : field.key === "west" ? "-118.4" : "-86.5"}
+                    className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-2 py-1.5 font-mono text-xs text-white outline-none focus:border-cyan-400"
+                  />
+                </label>
+              ))}
+            </div>
+            <button type="submit" className="w-full rounded-lg border border-cyan-500/50 bg-cyan-600/20 px-3 py-2 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-600/35">
+              Aplicar caja Lat/Lon
+            </button>
+            <p className="text-[10px] leading-relaxed text-gray-500">
+              El filtrado usa el centro geográfico de cada celda H3; las celdas que cruzan el borde pueden quedar incluidas o excluidas según su centro.
+            </p>
+          </form>
+
+          {aoiError && <p role="alert" className="text-[10px] leading-relaxed text-red-300">{aoiError}</p>}
+          <div className="rounded-lg border border-gray-700 bg-gray-900/70 p-2">
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Área activa</div>
+            <div className="mt-0.5 break-words text-xs font-semibold text-gray-200">
+              {selectedAOI?.label || "Vista global"}
+            </div>
+            <div className="mt-1 text-[10px] text-gray-400">
+              {selectedAOI ? `${rangeFilteredData.length.toLocaleString()} registros armonizados en el AOI` : `${fireData.length.toLocaleString()} registros en la cobertura actual`}
+            </div>
+            <p className="mt-1 text-[10px] text-gray-500">
+              También puedes hacer clic directamente en un hexágono del mapa para inspeccionar su historial.
+            </p>
+          </div>
+
+          <div className="border-t border-gray-700 pt-2">
+            <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300">Periodo de análisis</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[10px] text-gray-400">
+                Inicio
+                <input
+                  type="date"
+                  min={uniqueDates[0] || undefined}
+                  max={dateEnd || uniqueDates.at(-1) || undefined}
+                  value={dateStart}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setDateStart(value);
+                    if (dateEnd && value > dateEnd) setDateEnd(value);
+                    setIsPlaying(false);
+                  }}
+                  className="mt-1 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1.5 text-[11px] text-white outline-none focus:border-cyan-400"
+                />
+              </label>
+              <label className="text-[10px] text-gray-400">
+                Fin
+                <input
+                  type="date"
+                  min={dateStart || uniqueDates[0] || undefined}
+                  max={uniqueDates.at(-1) || undefined}
+                  value={dateEnd}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setDateEnd(value);
+                    if (dateStart && value < dateStart) setDateStart(value);
+                    setIsPlaying(false);
+                  }}
+                  className="mt-1 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-900 px-2 py-1.5 text-[11px] text-white outline-none focus:border-cyan-400"
+                />
+              </label>
+            </div>
+            <p className="mt-1.5 text-[10px] text-gray-500">
+              {rangeDates.length} días disponibles en el periodo seleccionado.
+            </p>
+          </div>
+        </section>
 
         {/* Selector de Mapa Base y Rampa de Color Accesible */}
         <div className="grid grid-cols-2 gap-2">
@@ -539,12 +984,13 @@ export default function App() {
         {/* Línea de Tiempo (Time-Lapse 30 días) */}
         <div className="bg-gray-800/90 p-3 rounded-xl border border-gray-700">
           <h3 className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-2">
-            Evolución Temporal ({uniqueDates.length || 30} Días)
+            Evolución Temporal ({rangeDates.length} Días)
           </h3>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="bg-orange-600 hover:bg-orange-500 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors shrink-0 shadow-lg cursor-pointer"
+              disabled={rangeDates.length < 2}
+              className="bg-orange-600 hover:bg-orange-500 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors shrink-0 shadow-lg cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isPlaying ? "⏸" : "▶"}
             </button>
@@ -555,11 +1001,12 @@ export default function App() {
               <input
                 type="range"
                 min={0}
-                max={Math.max(0, uniqueDates.length - 1)}
-                value={currentDateIndex}
+                max={Math.max(0, rangeDates.length - 1)}
+                value={Math.max(0, rangeDates.indexOf(currentDate))}
+                disabled={rangeDates.length === 0}
                 onChange={(e) => {
                   setIsPlaying(false);
-                  setCurrentDateIndex(Number(e.target.value));
+                  setCurrentDate(rangeDates[Number(e.target.value)] || "");
                 }}
                 className="w-full accent-orange-500 mt-1 cursor-pointer"
               />
@@ -733,11 +1180,19 @@ export default function App() {
       {/* LIENZO 3D PRINCIPAL */}
       <div className="flex-1 relative bg-gray-950">
         <DeckGL
-          initialViewState={INITIAL_VIEW_STATE}
+          viewState={viewState}
           controller={true}
           layers={layers}
           onViewStateChange={onViewStateChange}
         />
+
+        {selectedAOI && (
+          <div className="absolute top-4 left-4 z-20 max-w-[min(22rem,55%)] rounded-xl border border-orange-500/50 bg-gray-900/90 px-3 py-2 shadow-xl backdrop-blur-md">
+            <div className="text-[9px] font-bold uppercase tracking-wider text-orange-300">Área de interés activa</div>
+            <div className="truncate text-xs font-semibold text-white">{selectedAOI.label}</div>
+            <div className="text-[10px] text-gray-400">{rangeFilteredData.length.toLocaleString()} registros · {dateStart || "inicio"} a {dateEnd || "fin"}</div>
+          </div>
+        )}
 
         {/* Botón flotante superior derecho para acceso rápido al Calendario */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
@@ -746,33 +1201,31 @@ export default function App() {
             className="bg-gray-900/90 hover:bg-gray-800 text-white px-4 py-2 rounded-xl border border-orange-500/50 shadow-2xl text-xs font-bold flex items-center gap-2 backdrop-blur-md cursor-pointer transition-all"
           >
             <span>📅 Calendario Armonizado</span>
-            {calendarData?.summary && (
+            {rangeDates.length > 0 && (
               <span className="bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-md font-mono">
-                Mediana: {calendarData.summary.median_daily_cells} celdas/día
+                Mediana AOI: {aoiSummary.median_daily_cells} celdas/día
               </span>
             )}
           </button>
         </div>
 
         {/* PANEL / MODAL INTERACTIVO DEL CALENDARIO DE ACTIVIDAD DE QUEMA (SPRINT 2) */}
-        {isCalendarOpen && calendarData && (
+        {isCalendarOpen && fireData.length > 0 && (
           <div className="absolute inset-x-6 bottom-8 z-30 bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl p-5 max-h-[78vh] flex flex-col overflow-hidden">
             {/* Cabecera del Calendario */}
             <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-gray-800">
               <div>
                 <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
                   <span>
-                    📅 Calendario Armonizado de Actividad de Quema (MODIS +
-                    VIIRS)
+                    📅 Calendario de Actividad de Quema — {selectedAOI?.label || "Vista global"}
                   </span>
                   <span className="text-xs font-mono bg-orange-500/20 text-orange-300 px-2.5 py-0.5 rounded-full border border-orange-500/30">
                     H3 Nivel {h3Resolution}
                   </span>
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Fusión espacio-temporal de focos activos para identificar
-                  patrones estacionales, periodos críticos y anomalías frente a
-                  la mediana histórica.
+                  Actividad calculada con los registros armonizados del área y del periodo seleccionados.
+                  La anomalía se compara contra la mediana diaria de este mismo periodo.
                 </p>
               </div>
 
@@ -825,13 +1278,13 @@ export default function App() {
                   Mediana del Periodo
                 </div>
                 <div className="text-xl font-extrabold text-white font-mono mt-0.5">
-                  {calendarData.summary.median_daily_cells}{" "}
+                  {aoiSummary.median_daily_cells}{" "}
                   <span className="text-xs font-normal text-gray-400">
                     celdas H3/día
                   </span>
                 </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">
-                  Energía mediana: {calendarData.summary.median_daily_frp} MW
+                  Energía mediana: {aoiSummary.median_daily_frp} MW
                 </div>
               </div>
 
@@ -840,13 +1293,13 @@ export default function App() {
                   Día Crítico (Pico)
                 </div>
                 <div className="text-xl font-extrabold text-orange-400 font-mono mt-0.5">
-                  {calendarData.summary.peak_date}
+                  {aoiSummary.peak_date}
                 </div>
                 <div className="text-[11px] text-red-300 mt-0.5">
-                  {calendarData.summary.peak_cells} celdas (
-                  {calendarData.summary.peak_anomaly_pct > 0
-                    ? `+${calendarData.summary.peak_anomaly_pct}%`
-                    : `${calendarData.summary.peak_anomaly_pct}%`}{" "}
+                  {aoiSummary.peak_cells} celdas (
+                  {aoiSummary.peak_anomaly_pct > 0
+                    ? `+${aoiSummary.peak_anomaly_pct}%`
+                    : `${aoiSummary.peak_anomaly_pct}%`}{" "}
                   sobre mediana)
                 </div>
               </div>
@@ -856,12 +1309,12 @@ export default function App() {
                   Reducción de Duplicados
                 </div>
                 <div className="text-xl font-extrabold text-emerald-400 font-mono mt-0.5">
-                  {calendarData.summary.harmonization_efficiency_pct}%
+                  {aoiSummary.harmonization_efficiency_pct}%
                 </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">
-                  {calendarData.summary.total_raw_detections.toLocaleString()}{" "}
+                  {aoiSummary.total_raw_detections.toLocaleString()}{" "}
                   focos →{" "}
-                  {calendarData.summary.total_harmonized_cell_days.toLocaleString()}{" "}
+                  {aoiSummary.total_harmonized_cell_days.toLocaleString()}{" "}
                   celdas
                 </div>
               </div>
@@ -903,15 +1356,11 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-6 sm:grid-cols-10 gap-2">
-                  {calendarData.daily.map((dayItem) => {
-                    const ratio =
-                      (dayItem.harmonized_cells -
-                        calendarData.summary.min_daily_cells) /
-                      Math.max(
-                        1,
-                        calendarData.summary.max_daily_cells -
-                          calendarData.summary.min_daily_cells,
-                      );
+                  {aoiCalendar.daily.map((dayItem) => {
+                    const dailyRange = aoiSummary.max_daily_cells - aoiSummary.min_daily_cells;
+                    const ratio = dailyRange === 0
+                      ? (dayItem.harmonized_cells > 0 ? 1 : 0)
+                      : (dayItem.harmonized_cells - aoiSummary.min_daily_cells) / dailyRange;
                     const bg = getHeatColor(ratio);
                     const isSelected = currentDate === dayItem.date;
 
@@ -919,10 +1368,9 @@ export default function App() {
                       <button
                         key={dayItem.date}
                         onClick={() => {
-                          const idx = uniqueDates.indexOf(dayItem.date);
-                          if (idx !== -1) {
+                          if (rangeDates.includes(dayItem.date)) {
                             setIsPlaying(false);
-                            setCurrentDateIndex(idx);
+                            setCurrentDate(dayItem.date);
                           }
                         }}
                         style={{ backgroundColor: bg }}
@@ -959,7 +1407,7 @@ export default function App() {
                   </h4>
                   <div className="flex-1">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={calendarData.daily}>
+                      <BarChart data={aoiCalendar.daily}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                         <XAxis
                           dataKey="date"
@@ -977,7 +1425,7 @@ export default function App() {
                           }}
                         />
                         <ReferenceLine
-                          y={calendarData.summary.median_daily_cells}
+                          y={aoiSummary.median_daily_cells}
                           stroke="#38bdf8"
                           strokeDasharray="4 4"
                           label={{
@@ -998,56 +1446,58 @@ export default function App() {
                 </div>
 
                 <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-800 flex flex-col">
-                  <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
-                    Comparativa Mensual: Año Actual (2026) vs. Mediana Histórica
-                    MODIS+VIIRS
-                  </h4>
-                  <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={calendarData.monthly_climatology}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                        <XAxis dataKey="month" stroke="#9ca3af" fontSize={10} />
-                        <YAxis stroke="#9ca3af" fontSize={10} />
-                        <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: "#111827",
-                            border: "1px solid #374151",
-                            borderRadius: "8px",
-                            fontSize: "12px",
-                          }}
-                        />
-                        <Bar
-                          dataKey="current_year"
-                          name="Actividad 2026 (Celdas H3)"
-                          fill={activePalette.extremo.hex}
-                          radius={[4, 4, 0, 0]}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="historical_median"
-                          name="Mediana Histórica (2003-2025)"
-                          stroke="#38bdf8"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="critical_threshold"
-                          name="Umbral Crítico (P90)"
-                          stroke="#facc15"
-                          strokeDasharray="4 4"
-                          strokeWidth={1.5}
-                          dot={false}
-                        />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {selectedAOI ? (
+                    <>
+                      <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">Comparativa histórica regional</h4>
+                      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-700 p-5 text-center">
+                        <div>
+                          <div className="text-2xl">🧭</div>
+                          <p className="mt-2 text-sm font-semibold text-gray-200">Referencia histórica regional no disponible</p>
+                          <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                            La API entrega 31 días de celdas armonizadas y un calendario histórico global. No contiene una serie multi-anual geolocalizada para calcular una mediana histórica exclusiva de este AOI.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : calendarData?.monthly_climatology ? (
+                    <>
+                      <h4 className="text-xs font-bold text-gray-300 uppercase mb-2">
+                        Comparativa mensual global: actividad y referencia climatológica
+                      </h4>
+                      <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={calendarData.monthly_climatology}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                            <XAxis dataKey="month" stroke="#9ca3af" fontSize={10} />
+                            <YAxis stroke="#9ca3af" fontSize={10} />
+                            <RechartsTooltip contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", borderRadius: "8px", fontSize: "12px" }} />
+                            <Bar dataKey="current_year" name="Actividad estimada/observada (celdas H3)" fill={activePalette.extremo.hex} radius={[4, 4, 0, 0]} />
+                            <Line type="monotone" dataKey="historical_median" name="Referencia mediana" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="critical_threshold" name="Umbral de referencia" stroke="#facc15" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <p className="mt-1 text-[10px] text-gray-500">Referencia global del backend; no está filtrada por el rango ni representa una climatología regional observada.</p>
+                    </>
+                  ) : (
+                    <p className="m-auto text-xs text-gray-400">No hay datos de referencia mensual disponibles.</p>
+                  )}
                 </div>
               </div>
             )}
 
             {/* CONTENIDO DE PESTAÑA 3: MATRIZ MULTI-ANUAL (AÑOS X MESES) */}
-            {calendarTab === "MULTIYEAR" && (
+            {calendarTab === "MULTIYEAR" && selectedAOI && (
+              <div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed border-gray-700 p-6 text-center">
+                <div className="max-w-xl">
+                  <div className="text-2xl">🗺️</div>
+                  <h3 className="mt-2 text-sm font-bold text-white">Matriz multi-anual no disponible para este AOI</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-400">La matriz actual del backend es global y no conserva la ubicación de cada año/mes. Para no atribuir cifras globales a una región, esta vista se habilitará cuando exista un histórico multi-anual geolocalizado.</p>
+                </div>
+              </div>
+            )}
+
+            {calendarTab === "MULTIYEAR" && !selectedAOI && calendarData?.multiyear_matrix && (
               <div className="overflow-x-auto overflow-y-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead>
